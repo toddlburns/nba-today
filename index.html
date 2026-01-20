@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA on TV Tonight</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+            color: #111;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 14px;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #999;
+            margin-bottom: 40px;
+        }
+
+        #games {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .game {
+            padding: 20px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .game:last-child {
+            border-bottom: none;
+        }
+
+        .teams {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .details {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .time {
+            margin-right: 20px;
+        }
+
+        .network {
+            font-weight: 500;
+            color: #111;
+        }
+
+        .no-games {
+            font-size: 18px;
+            color: #666;
+            text-align: center;
+        }
+
+        .loading {
+            font-size: 16px;
+            color: #999;
+        }
+
+        .date {
+            font-size: 12px;
+            color: #bbb;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>NBA on TV Tonight</h1>
+    <div id="games">
+        <p class="loading">Loading...</p>
+    </div>
+    <p class="date" id="date"></p>
+
+    <script>
+        const NATIONAL_NETWORKS = ['ESPN', 'TNT', 'ABC', 'NBA TV', 'NBATV'];
+
+        async function fetchGames() {
+            const today = new Date();
+            const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+
+            // Display current date
+            document.getElementById('date').textContent = today.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            try {
+                // Use NBA CDN scoreboard endpoint
+                const response = await fetch(`https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json`);
+                const data = await response.json();
+
+                // Find today's games
+                const todayFormatted = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+                const gameWeek = data.leagueSchedule.gameDates.find(gd => {
+                    const gameDate = new Date(gd.gameDate);
+                    return gameDate.toDateString() === today.toDateString();
+                });
+
+                if (!gameWeek || !gameWeek.games) {
+                    showNoGames();
+                    return;
+                }
+
+                // Filter for nationally televised games
+                const nationalGames = gameWeek.games.filter(game => {
+                    if (!game.broadcasters || !game.broadcasters.nationalTvBroadcasters) return false;
+                    return game.broadcasters.nationalTvBroadcasters.length > 0;
+                });
+
+                if (nationalGames.length === 0) {
+                    showNoGames();
+                    return;
+                }
+
+                displayGames(nationalGames);
+
+            } catch (error) {
+                console.error('Error fetching games:', error);
+                // Fallback: try alternative endpoint
+                tryAlternativeSource();
+            }
+        }
+
+        async function tryAlternativeSource() {
+            try {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+
+                const response = await fetch(`https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json`);
+                const data = await response.json();
+
+                if (!data.scoreboard || !data.scoreboard.games || data.scoreboard.games.length === 0) {
+                    showNoGames();
+                    return;
+                }
+
+                const nationalGames = data.scoreboard.games.filter(game => {
+                    if (!game.broadcasters) return false;
+                    const national = game.broadcasters.nationalBroadcasters || [];
+                    return national.length > 0;
+                });
+
+                if (nationalGames.length === 0) {
+                    showNoGames();
+                    return;
+                }
+
+                displayGamesAlt(nationalGames);
+
+            } catch (error) {
+                console.error('Alternative source failed:', error);
+                document.getElementById('games').innerHTML = '<p class="no-games">Unable to load game data. Please try again later.</p>';
+            }
+        }
+
+        function displayGames(games) {
+            const container = document.getElementById('games');
+            container.innerHTML = '';
+
+            games.forEach(game => {
+                const gameTime = new Date(game.gameDateTimeUTC);
+                const estTime = gameTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZone: 'America/New_York'
+                });
+                const pstTime = gameTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZone: 'America/Los_Angeles'
+                });
+
+                const networks = game.broadcasters.nationalTvBroadcasters
+                    .map(b => b.broadcasterDisplay)
+                    .join(', ');
+
+                const div = document.createElement('div');
+                div.className = 'game';
+                div.innerHTML = `
+                    <div class="teams">${game.awayTeam.teamCity} ${game.awayTeam.teamName} @ ${game.homeTeam.teamCity} ${game.homeTeam.teamName}</div>
+                    <div class="details">
+                        <span class="time">${estTime} EST / ${pstTime} PST</span>
+                        <span class="network">${networks}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function displayGamesAlt(games) {
+            const container = document.getElementById('games');
+            container.innerHTML = '';
+
+            games.forEach(game => {
+                const gameTime = new Date(game.gameTimeUTC);
+                const estTime = gameTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZone: 'America/New_York'
+                });
+                const pstTime = gameTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZone: 'America/Los_Angeles'
+                });
+
+                const national = game.broadcasters.nationalBroadcasters || [];
+                const networks = national.map(b => b.broadcasterDisplay || b.broadcasterName).join(', ');
+
+                const div = document.createElement('div');
+                div.className = 'game';
+                div.innerHTML = `
+                    <div class="teams">${game.awayTeam.teamCity} ${game.awayTeam.teamName} @ ${game.homeTeam.teamCity} ${game.homeTeam.teamName}</div>
+                    <div class="details">
+                        <span class="time">${estTime} EST / ${pstTime} PST</span>
+                        <span class="network">${networks}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function showNoGames() {
+            document.getElementById('games').innerHTML = '<p class="no-games">There are no nationally televised games tonight.</p>';
+        }
+
+        // Load games on page load
+        fetchGames();
+    </script>
+</body>
+</html>
