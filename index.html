@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NBA on TV Tonight</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NBA Tonight">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23f77f00' width='100' height='100' rx='20'/><text x='50' y='65' text-anchor='middle' font-size='50' fill='white'>🏀</text></svg>">
+    <title>NBA Tonight</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,208 +19,385 @@
         }
 
         body {
-            font-family: 'Roboto Condensed', sans-serif;
-            background: #1a1a2e;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #1a0a0a 0%, #2d1810 50%, #1a0a0a 100%);
             color: #fff;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 40px 20px;
+            padding: 20px;
         }
 
         .container {
-            max-width: 700px;
-            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
+        /* Groovy wavy header */
         header {
             text-align: center;
-            margin-bottom: 50px;
-            border-bottom: 4px solid #f77f00;
-            padding-bottom: 30px;
+            margin-bottom: 40px;
+            position: relative;
+            padding: 40px 20px;
+            background: linear-gradient(180deg, #f77f00 0%, #e85d04 100%);
+            border-radius: 0 0 50% 50% / 0 0 30px 30px;
+            box-shadow: 0 10px 40px rgba(247, 127, 0, 0.4);
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 40px;
+            background: #f77f00;
+            border-radius: 50%;
         }
 
         h1 {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 48px;
+            font-family: 'Righteous', cursive;
+            font-size: clamp(36px, 10vw, 64px);
             text-transform: uppercase;
+            color: #fff;
+            text-shadow: 4px 4px 0 #6b2d0a, 6px 6px 20px rgba(0,0,0,0.5);
             letter-spacing: 4px;
-            color: #f77f00;
-            text-shadow: 3px 3px 0 #006bb6, 6px 6px 0 rgba(0,0,0,0.3);
-            margin-bottom: 10px;
         }
 
         .subtitle {
             font-size: 14px;
             text-transform: uppercase;
             letter-spacing: 6px;
-            color: #006bb6;
+            color: rgba(255,255,255,0.9);
+            margin-top: 10px;
         }
 
         .date {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 18px;
+            font-family: 'Righteous', cursive;
+            font-size: 20px;
             color: #f77f00;
             text-transform: uppercase;
             letter-spacing: 2px;
             margin-bottom: 30px;
             text-align: center;
+            padding: 15px;
+            background: rgba(247, 127, 0, 0.1);
+            border-radius: 50px;
+            border: 2px solid #f77f00;
         }
 
         #games {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 25px;
         }
 
         .game {
-            background: linear-gradient(135deg, #006bb6 0%, #003d6b 100%);
-            border-left: 6px solid #f77f00;
-            padding: 25px 30px;
+            background: linear-gradient(135deg, #3d2914 0%, #2a1a0a 100%);
+            border-radius: 30px;
+            padding: 25px;
             position: relative;
             overflow: hidden;
+            border: 3px solid #5a3d20;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
 
+        /* Curvy decorative elements */
         .game::before {
             content: '';
             position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(247, 127, 0, 0.1));
+            top: -50%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(247, 127, 0, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
         }
 
-        .teams {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 26px;
+        .game::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(247, 127, 0, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        /* PELICANS SPECIAL TREATMENT */
+        .pelicans-game {
+            background: linear-gradient(135deg, #0C2340 0%, #C8A961 50%, #0C2340 100%);
+            border: 4px solid #C8A961;
+            animation: pelicansGlow 2s ease-in-out infinite;
+            position: relative;
+        }
+
+        .pelicans-game::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 40%, rgba(200, 169, 97, 0.3) 50%, transparent 60%);
+            animation: shimmer 3s infinite;
+            border-radius: 27px;
+        }
+
+        @keyframes pelicansGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(200, 169, 97, 0.5), 0 0 40px rgba(200, 169, 97, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(200, 169, 97, 0.8), 0 0 60px rgba(200, 169, 97, 0.5); }
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .pelicans-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: linear-gradient(135deg, #C8A961 0%, #B4975A 100%);
+            color: #0C2340;
+            font-family: 'Righteous', cursive;
+            font-size: 12px;
+            padding: 8px 20px;
+            border-radius: 20px;
             text-transform: uppercase;
-            margin-bottom: 12px;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(200, 169, 97, 0.5);
+            z-index: 10;
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .matchup {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team {
+            flex: 1;
+            text-align: center;
+        }
+
+        /* 70s Style Retro Logo */
+        .retro-logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Righteous', cursive;
+            font-size: 20px;
+            color: white;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+            margin: 0 auto 10px;
+            border: 4px solid rgba(255,255,255,0.3);
+            box-shadow:
+                0 4px 15px rgba(0,0,0,0.4),
+                inset 0 -3px 10px rgba(0,0,0,0.3),
+                inset 0 3px 10px rgba(255,255,255,0.2);
+            position: relative;
+        }
+
+        .retro-logo::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            width: 20px;
+            height: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+        }
+
+        .team-name {
+            font-family: 'Righteous', cursive;
+            font-size: 16px;
+            text-transform: uppercase;
+            line-height: 1.3;
+            color: #fff;
+        }
+
+        .injuries {
+            margin-top: 8px;
+        }
+
+        .injured {
+            display: inline-block;
+            background: #c0392b;
+            color: white;
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 15px;
+            margin: 2px;
+            font-weight: 600;
+        }
+
+        .vs-section {
+            text-align: center;
+            padding: 0 10px;
         }
 
         .at-symbol {
+            font-family: 'Righteous', cursive;
+            font-size: 28px;
             color: #f77f00;
-            margin: 0 10px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
         }
 
-        .details {
-            display: flex;
-            gap: 30px;
-            font-size: 16px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .time {
-            color: rgba(255,255,255,0.9);
+        .game-time {
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+            margin: 8px 0;
+            white-space: nowrap;
         }
 
         .network {
-            font-weight: 700;
+            font-family: 'Righteous', cursive;
+            font-size: 14px;
             color: #f77f00;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(247, 127, 0, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
         }
 
         .no-games {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 22px;
+            font-family: 'Righteous', cursive;
+            font-size: 24px;
             color: #f77f00;
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 2px;
             padding: 60px 20px;
-            background: linear-gradient(135deg, #006bb6 0%, #003d6b 100%);
-            border-left: 6px solid #f77f00;
+            background: linear-gradient(135deg, #3d2914 0%, #2a1a0a 100%);
+            border-radius: 30px;
+            border: 3px solid #5a3d20;
         }
 
         footer {
-            margin-top: 50px;
+            margin-top: 40px;
             text-align: center;
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 3px;
-            color: #444;
+            color: #5a3d20;
+            padding-bottom: 20px;
         }
 
-        /* Retro scan lines effect */
-        body::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.1),
-                rgba(0, 0, 0, 0.1) 1px,
-                transparent 1px,
-                transparent 2px
-            );
-            z-index: 1000;
-        }
-
-        .stripe-top {
-            height: 8px;
-            background: repeating-linear-gradient(
-                90deg,
-                #f77f00,
-                #f77f00 20px,
-                #006bb6 20px,
-                #006bb6 40px
-            );
-            margin-bottom: 40px;
-        }
-
-        .stripe-bottom {
-            height: 8px;
-            background: repeating-linear-gradient(
-                90deg,
-                #006bb6,
-                #006bb6 20px,
-                #f77f00 20px,
-                #f77f00 40px
-            );
+        /* Decorative curves at bottom */
+        .wave-decoration {
+            height: 60px;
             margin-top: 40px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 100'%3E%3Cpath fill='%23f77f00' fill-opacity='0.3' d='M0,50 C360,100 720,0 1080,50 C1260,75 1380,50 1440,50 L1440,100 L0,100 Z'/%3E%3C/svg%3E") repeat-x;
+            background-size: 100% 100%;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 600px) {
+            .matchup {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .team {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                text-align: left;
+            }
+
+            .team.home {
+                flex-direction: row-reverse;
+                text-align: right;
+            }
+
+            .retro-logo {
+                margin: 0;
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+
+            .vs-section {
+                padding: 10px 0;
+                border-top: 1px solid rgba(247, 127, 0, 0.3);
+                border-bottom: 1px solid rgba(247, 127, 0, 0.3);
+                width: 100%;
+            }
+
+            .at-symbol {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="stripe-top"></div>
         <header>
             <h1>NBA Tonight</h1>
-            <div class="subtitle">Nationally Televised Games</div>
+            <div class="subtitle">Peacock • Prime • ABC • NBC</div>
         </header>
-        <div class="date" id="date">Tuesday, January 20, 2026</div>
+        <div class="date">Tuesday, January 20, 2026</div>
         <div id="games">
             
             <div class="game">
-                <div class="teams">Oklahoma City Thunder <span class="at-symbol">@</span> Cleveland Cavaliers</div>
-                <div class="details">
-                    <span class="time">2:30 PM ET / 11:30 AM PT</span>
-                    <span class="network">NBC</span>
+                
+                <div class="matchup">
+                    <div class="team away">
+                        <div class="retro-logo" style="background: #C4CED4">SAS</div>
+                        <div class="team-name">San Antonio<br>Spurs</div>
+                        
+                    </div>
+                    <div class="vs-section">
+                        <div class="at-symbol">@</div>
+                        <div class="game-time">8:00 PM ET / 5:00 PM PT</div>
+                        <div class="network">NBC, Peacock</div>
+                    </div>
+                    <div class="team home">
+                        <div class="retro-logo" style="background: #CE1141">HOU</div>
+                        <div class="team-name">Houston<br>Rockets</div>
+                        
+                    </div>
                 </div>
             </div>
             <div class="game">
-                <div class="teams">Dallas Mavericks <span class="at-symbol">@</span> New York Knicks</div>
-                <div class="details">
-                    <span class="time">5:00 PM ET / 2:00 PM PT</span>
-                    <span class="network">NBC</span>
-                </div>
-            </div>
-            <div class="game">
-                <div class="teams">Boston Celtics <span class="at-symbol">@</span> Detroit Pistons</div>
-                <div class="details">
-                    <span class="time">8:00 PM ET / 5:00 PM PT</span>
-                    <span class="network">NBC</span>
+                
+                <div class="matchup">
+                    <div class="team away">
+                        <div class="retro-logo" style="background: #552583">LAL</div>
+                        <div class="team-name">Los Angeles<br>Lakers</div>
+                        
+                    </div>
+                    <div class="vs-section">
+                        <div class="at-symbol">@</div>
+                        <div class="game-time">10:00 PM ET / 7:00 PM PT</div>
+                        <div class="network">NBC, Peacock</div>
+                    </div>
+                    <div class="team home">
+                        <div class="retro-logo" style="background: #0E2240">DEN</div>
+                        <div class="team-name">Denver<br>Nuggets</div>
+                        
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="stripe-bottom"></div>
-        <footer>Updated Daily</footer>
+        <div class="wave-decoration"></div>
+        <footer>Updated Daily • Add to Home Screen for App Experience</footer>
     </div>
 </body>
 </html>
