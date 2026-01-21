@@ -89,32 +89,6 @@
             text-transform: uppercase;
         }
 
-        /* ===== ON THIS DAY SECTION ===== */
-        .history-section {
-            background: linear-gradient(135deg, #1a1206 0%, #0d0906 100%);
-            padding: 12px 20px;
-            border-bottom: 1px solid #3d2914;
-        }
-
-        .history-title {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #8B6914;
-            margin-bottom: 6px;
-        }
-
-        .history-fact {
-            font-size: 12px;
-            color: #c4a35a;
-            line-height: 1.4;
-        }
-
-        .history-year {
-            font-weight: 700;
-            color: #e8c547;
-        }
-
         /* ===== PELICANS SECTION ===== */
         .pelicans-section {
             background: linear-gradient(180deg, #0C2340 0%, #071428 50%, #0C2340 100%);
@@ -308,7 +282,48 @@
             color: #E8C777;
         }
 
-        /* Cap & Draft */
+        /* Game Results */
+        .game-result {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+        }
+
+        .game-result:last-child {
+            border-bottom: none;
+        }
+
+        .game-result-opponent {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .game-result-win {
+            color: #7FBF7F;
+        }
+
+        .game-result-loss {
+            color: #BF7F7F;
+        }
+
+        .game-result-info {
+            text-align: right;
+            font-size: 11px;
+        }
+
+        .game-result-score {
+            font-weight: 700;
+            color: #E8D9A0;
+        }
+
+        .game-result-date {
+            color: #6B8299;
+            font-size: 10px;
+        }
+
+        /* Draft picks */
         .cap-item {
             display: flex;
             justify-content: space-between;
@@ -451,14 +466,6 @@
         </div>
     </section>
 
-    <!-- ON THIS DAY -->
-    <section class="history-section">
-        <div class="history-title">On This Day in NBA History</div>
-        <div class="history-fact">
-            <span class="history-year">Jan 20, 1972:</span> The Lakers were in the midst of their record 33-game win streak. Jerry West and Wilt Chamberlain's squad would finish 69-13 and capture the championship.
-        </div>
-    </section>
-
     <!-- PELICANS CELEBRATION -->
     <section class="pelicans-section">
         <div class="pels-header">
@@ -469,7 +476,43 @@
             </div>
         </div>
 
+        <!-- YouTube Section - Above boxes -->
+        <div class="pels-youtube-section" style="margin-bottom: 20px;">
+            <a href="https://www.youtube.com/@NBA" target="_blank" class="youtube-link">
+                <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+                Watch Latest Pelicans Highlights on NBA YouTube
+            </a>
+        </div>
+
         <div class="pels-grid">
+            <!-- Last 3 Games -->
+            <div class="pels-card">
+                <div class="pels-card-title">Last 3 Games</div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-win">vs Wizards</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">W 118-102</div>
+                        <div class="game-result-date">Sun 1/19</div>
+                    </div>
+                </div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-win">@ Hornets</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">W 124-110</div>
+                        <div class="game-result-date">Fri 1/17</div>
+                    </div>
+                </div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-win">vs Jazz</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">W 108-104</div>
+                        <div class="game-result-date">Wed 1/15</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Next 3 Games -->
             <div class="pels-card">
                 <div class="pels-card-title">Next 3 Games</div>
@@ -529,27 +572,6 @@
                 </div>
             </div>
 
-            <!-- Salary Cap -->
-            <div class="pels-card">
-                <div class="pels-card-title">Cap Situation</div>
-                <div class="cap-item">
-                    <span class="cap-label">Team Payroll</span>
-                    <span class="cap-value">$189.3M</span>
-                </div>
-                <div class="cap-item">
-                    <span class="cap-label">Salary Cap</span>
-                    <span class="cap-value">$154.6M</span>
-                </div>
-                <div class="cap-item">
-                    <span class="cap-label">Tax Space</span>
-                    <span class="cap-value cap-good">$1.9M</span>
-                </div>
-                <div class="cap-item">
-                    <span class="cap-label">Zion's Deal</span>
-                    <span class="cap-value">$126.5M (5yr)</span>
-                </div>
-            </div>
-
             <!-- Draft Capital -->
             <div class="pels-card">
                 <div class="pels-card-title">Draft Capital</div>
@@ -585,18 +607,6 @@
                 <div class="fun-fact">
                     <div class="fun-fact-label">Trey Day</div>
                     <div class="fun-fact-text">Trey Murphy III dropped 42 on the Lakers on New Year's Day. He's been the go-to scorer with all the injuries.</div>
-                </div>
-            </div>
-
-            <!-- YouTube Section -->
-            <div class="pels-card pels-card-full">
-                <div class="pels-youtube-section">
-                    <a href="https://www.youtube.com/@NBA" target="_blank" class="youtube-link">
-                        <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                        Watch Latest Pelicans Highlights on NBA YouTube
-                    </a>
                 </div>
             </div>
         </div>
