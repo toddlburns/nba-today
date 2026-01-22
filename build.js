@@ -76,9 +76,9 @@ function formatDate() {
 }
 
 function getTodayDateString() {
-    // Get today's date in ET timezone for NBA API matching (format: MM/DD/YYYY)
+    // Get today's date in PST timezone to match display (format: MM/DD/YYYY)
     const now = new Date();
-    const options = { timeZone: 'America/New_York' };
+    const options = { timeZone: 'America/Los_Angeles' };
     const month = String(now.toLocaleString('en-US', { ...options, month: 'numeric' })).padStart(2, '0');
     const day = String(now.toLocaleString('en-US', { ...options, day: 'numeric' })).padStart(2, '0');
     const year = now.toLocaleString('en-US', { ...options, year: 'numeric' });
@@ -234,25 +234,25 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
 
         /* ===== TOP SECTION - MINIMAL TV SCHEDULE ===== */
         .tv-section {
-            background: #1a1a1a;
+            background: #ffffff;
             padding: 15px 20px 20px;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid #e0e0e0;
         }
 
         .tv-header {
             font-family: 'Poppins', sans-serif;
             font-size: 14px;
-            font-weight: 400;
+            font-weight: 600;
             text-transform: lowercase;
             letter-spacing: 1px;
-            color: #888;
+            color: #333;
             text-align: center;
             margin-bottom: 12px;
         }
 
         .tv-date {
             font-size: 11px;
-            color: #555;
+            color: #888;
             text-align: center;
             margin-bottom: 15px;
         }
@@ -269,16 +269,16 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
             align-items: center;
             gap: 8px;
             font-size: 13px;
-            color: #aaa;
+            color: #666;
         }
 
         .tv-teams {
             font-weight: 600;
-            color: #fff;
+            color: #111;
         }
 
         .tv-at {
-            color: #555;
+            color: #999;
             font-size: 11px;
         }
 
@@ -288,8 +288,8 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
         }
 
         .tv-network {
-            background: #333;
-            color: #888;
+            background: #f0f0f0;
+            color: #555;
             font-size: 10px;
             padding: 2px 8px;
             border-radius: 3px;
@@ -298,7 +298,7 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
 
         .tv-no-games {
             text-align: center;
-            color: #555;
+            color: #888;
             font-size: 13px;
         }
 
