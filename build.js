@@ -56,27 +56,22 @@ function fetch(url) {
 
 function formatTime(dateStr) {
     const date = new Date(dateStr);
-    const estTime = date.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: 'America/New_York'
-    });
     const pstTime = date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         timeZone: 'America/Los_Angeles'
     });
-    return `${estTime} ET / ${pstTime} PT`;
+    return pstTime;
 }
 
 function formatDate() {
-    // Format current date in ET timezone
+    // Format current date in PST timezone
     return new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        timeZone: 'America/New_York'
+        timeZone: 'America/Los_Angeles'
     });
 }
 
@@ -95,36 +90,20 @@ function getTeamAbbrev(city, name) {
     return TEAM_ABBREVS[fullName] || name.substring(0, 3).toUpperCase();
 }
 
-function getTeamColor(abbrev) {
-    return TEAM_COLORS[abbrev] || '#f77f00';
-}
-
-function isPelicansGame(game) {
-    const awayName = `${game.awayTeam.teamCity} ${game.awayTeam.teamName}`;
-    const homeName = `${game.homeTeam.teamCity} ${game.homeTeam.teamName}`;
-    return awayName.includes(FAVORITE_TEAM) || homeName.includes(FAVORITE_TEAM);
-}
-
 function isWantedNetwork(networkName) {
     const upper = (networkName || '').toUpperCase();
-    // First check if it's excluded
     if (EXCLUDED_NETWORKS.some(ex => upper.includes(ex.toUpperCase()))) {
         return false;
     }
-    // Then check if it's wanted
     return WANTED_NETWORKS.some(w => upper.includes(w));
 }
 
-async function fetchInjuries() {
-    // Try to fetch injury data - this is a simplified version
-    // In production, you'd want to use a proper NBA injuries API
+function loadJsonFile(path) {
     try {
-        // NBA doesn't have a public injury API, so we'll return empty for now
-        // You could integrate with a sports data provider like ESPN or SportsReference
-        return {};
+        return JSON.parse(fs.readFileSync(path, 'utf8'));
     } catch (e) {
-        console.log('Could not fetch injuries:', e.message);
-        return {};
+        console.log(`Could not load ${path}:`, e.message);
+        return null;
     }
 }
 
@@ -134,12 +113,15 @@ async function buildPage() {
 
     console.log('Building for date:', todayMatch, '(' + dateStr + ')');
 
-    let gamesHtml = '';
+    // Load data files
+    const talkingPoints = loadJsonFile('./data/talking-points.json');
+    const draftCapital = loadJsonFile('./data/draft-capital.json');
+
+    let tvGamesHtml = '';
     let hasGames = false;
 
     try {
         const scheduleData = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
-        const injuries = await fetchInjuries();
 
         const gameDay = scheduleData.leagueSchedule.gameDates.find(gd =>
             gd.gameDate.startsWith(todayMatch)
@@ -165,64 +147,64 @@ async function buildPage() {
 
                     const awayAbbrev = getTeamAbbrev(game.awayTeam.teamCity, game.awayTeam.teamName);
                     const homeAbbrev = getTeamAbbrev(game.homeTeam.teamCity, game.homeTeam.teamName);
-                    const awayColor = getTeamColor(awayAbbrev);
-                    const homeColor = getTeamColor(homeAbbrev);
 
-                    const isPelicans = isPelicansGame(game);
-                    const gameClass = isPelicans ? 'game pelicans-game' : 'game';
-
-                    // Get injured top players (placeholder - would need real injury data)
-                    const awayInjuries = injuries[awayAbbrev] || [];
-                    const homeInjuries = injuries[homeAbbrev] || [];
-
-                    const awayInjuryHtml = awayInjuries.length > 0
-                        ? `<div class="injuries">${awayInjuries.map(p => `<span class="injured">${p}</span>`).join('')}</div>`
-                        : '';
-                    const homeInjuryHtml = homeInjuries.length > 0
-                        ? `<div class="injuries">${homeInjuries.map(p => `<span class="injured">${p}</span>`).join('')}</div>`
-                        : '';
-
-                    gamesHtml += `
-            <div class="${gameClass}">
-                ${isPelicans ? '<div class="pelicans-badge">YOUR PELS!</div>' : ''}
-                <div class="matchup">
-                    <div class="team away">
-                        <div class="retro-logo" style="background: ${awayColor}">${awayAbbrev}</div>
-                        <div class="team-name">${game.awayTeam.teamCity}<br>${game.awayTeam.teamName}</div>
-                        ${awayInjuryHtml}
-                    </div>
-                    <div class="vs-section">
-                        <div class="at-symbol">@</div>
-                        <div class="game-time">${time}</div>
-                        <div class="network">${networks}</div>
-                    </div>
-                    <div class="team home">
-                        <div class="retro-logo" style="background: ${homeColor}">${homeAbbrev}</div>
-                        <div class="team-name">${game.homeTeam.teamCity}<br>${game.homeTeam.teamName}</div>
-                        ${homeInjuryHtml}
-                    </div>
-                </div>
+                    tvGamesHtml += `
+            <div class="tv-game">
+                <span class="tv-teams">${awayAbbrev} <span class="tv-at">@</span> ${homeAbbrev}</span>
+                <span class="tv-time">${time}</span>
+                <span class="tv-network">${networks}</span>
             </div>`;
                 });
             }
         }
 
         if (!hasGames) {
-            gamesHtml = `<div class="no-games">No games on your channels today, baby!</div>`;
+            tvGamesHtml = `<div class="tv-no-games">No games on your channels today</div>`;
         }
 
     } catch (error) {
         console.error('Error fetching games:', error);
-        gamesHtml = `<div class="no-games">Couldn't grab the schedule, man. Try again later!</div>`;
+        tvGamesHtml = `<div class="tv-no-games">Couldn't load schedule</div>`;
+    }
+
+    // Generate talking points HTML (only one item)
+    let talkingPointsHtml = '';
+    if (talkingPoints && talkingPoints.item) {
+        talkingPointsHtml = `
+            <div class="fun-fact">
+                <div class="fun-fact-label">${talkingPoints.item.label}</div>
+                <div class="fun-fact-text">${talkingPoints.item.text}</div>
+            </div>`;
+    }
+
+    // Generate draft capital HTML
+    let draftCapitalHtml = '';
+    if (draftCapital) {
+        draftCapitalHtml = draftCapital.picks.map(pick => `
+            <div class="cap-item">
+                <span class="cap-label">${pick.year} ${pick.round}</span>
+                <span class="cap-value ${pick.statusClass}">${pick.status}</span>
+            </div>`).join('');
+
+        if (draftCapital.intel) {
+            draftCapitalHtml += `
+            <div class="fun-fact">
+                <div class="fun-fact-label">${draftCapital.intel.label}</div>
+                <div class="fun-fact-text">${draftCapital.intel.text}</div>
+            </div>`;
+        }
     }
 
     // Generate the full HTML
-    const html = generateHTML(dateStr, gamesHtml);
+    const html = generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml);
     fs.writeFileSync('index.html', html);
     console.log('Page built successfully for', dateStr);
 }
 
-function generateHTML(dateStr, gamesHtml) {
+function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml) {
+    // YouTube search URL for Pelicans sorted by most recent uploads
+    const youtubeUrl = 'https://www.youtube.com/@NBA/search?query=pelicans';
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -235,7 +217,7 @@ function generateHTML(dateStr, gamesHtml) {
     <title>NBA Tonight</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -245,345 +227,551 @@ function generateHTML(dateStr, gamesHtml) {
 
         body {
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #1a0a0a 0%, #2d1810 50%, #1a0a0a 100%);
+            background: #111;
             color: #fff;
             min-height: 100vh;
-            padding: 20px;
         }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        /* ===== TOP SECTION - MINIMAL TV SCHEDULE ===== */
+        .tv-section {
+            background: #1a1a1a;
+            padding: 15px 20px 20px;
+            border-bottom: 1px solid #333;
         }
 
-        /* Groovy wavy header */
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            position: relative;
-            padding: 40px 20px;
-            background: linear-gradient(180deg, #f77f00 0%, #e85d04 100%);
-            border-radius: 0 0 50% 50% / 0 0 30px 30px;
-            box-shadow: 0 10px 40px rgba(247, 127, 0, 0.4);
-        }
-
-        header::before {
-            content: '';
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            height: 40px;
-            background: #f77f00;
-            border-radius: 50%;
-        }
-
-        h1 {
-            font-family: 'Righteous', cursive;
-            font-size: clamp(36px, 10vw, 64px);
-            text-transform: uppercase;
-            color: #fff;
-            text-shadow: 4px 4px 0 #6b2d0a, 6px 6px 20px rgba(0,0,0,0.5);
-            letter-spacing: 4px;
-        }
-
-        .subtitle {
+        .tv-header {
+            font-family: 'Poppins', sans-serif;
             font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 6px;
-            color: rgba(255,255,255,0.9);
-            margin-top: 10px;
-        }
-
-        .date {
-            font-family: 'Righteous', cursive;
-            font-size: 20px;
-            color: #f77f00;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 30px;
+            font-weight: 400;
+            text-transform: lowercase;
+            letter-spacing: 1px;
+            color: #888;
             text-align: center;
-            padding: 15px;
-            background: rgba(247, 127, 0, 0.1);
-            border-radius: 50px;
-            border: 2px solid #f77f00;
+            margin-bottom: 12px;
         }
 
-        #games {
+        .tv-date {
+            font-size: 11px;
+            color: #555;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .tv-games {
             display: flex;
-            flex-direction: column;
-            gap: 25px;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
         }
 
-        .game {
-            background: linear-gradient(135deg, #3d2914 0%, #2a1a0a 100%);
-            border-radius: 30px;
-            padding: 25px;
+        .tv-game {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .tv-teams {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .tv-at {
+            color: #555;
+            font-size: 11px;
+        }
+
+        .tv-time {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .tv-network {
+            background: #333;
+            color: #888;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .tv-no-games {
+            text-align: center;
+            color: #555;
+            font-size: 13px;
+        }
+
+        /* ===== PELICANS SECTION ===== */
+        .pelicans-section {
+            background: linear-gradient(180deg, #0C2340 0%, #071428 50%, #0C2340 100%);
+            padding: 25px 20px 30px;
             position: relative;
             overflow: hidden;
-            border: 3px solid #5a3d20;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
 
-        /* Curvy decorative elements */
-        .game::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 200px;
-            height: 200px;
-            background: radial-gradient(circle, rgba(247, 127, 0, 0.15) 0%, transparent 70%);
-            border-radius: 50%;
-        }
-
-        .game::after {
-            content: '';
-            position: absolute;
-            bottom: -30%;
-            left: -10%;
-            width: 150px;
-            height: 150px;
-            background: radial-gradient(circle, rgba(247, 127, 0, 0.1) 0%, transparent 70%);
-            border-radius: 50%;
-        }
-
-        /* PELICANS SPECIAL TREATMENT */
-        .pelicans-game {
-            background: linear-gradient(135deg, #0C2340 0%, #C8A961 50%, #0C2340 100%);
-            border: 4px solid #C8A961;
-            animation: pelicansGlow 2s ease-in-out infinite;
-            position: relative;
-        }
-
-        .pelicans-game::before {
+        .pelicans-section::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            bottom: 0;
-            background: linear-gradient(45deg, transparent 40%, rgba(200, 169, 97, 0.3) 50%, transparent 60%);
-            animation: shimmer 3s infinite;
-            border-radius: 27px;
+            height: 4px;
+            background: linear-gradient(90deg, #C8A961, #E31837, #C8A961);
         }
 
-        @keyframes pelicansGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(200, 169, 97, 0.5), 0 0 40px rgba(200, 169, 97, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(200, 169, 97, 0.8), 0 0 60px rgba(200, 169, 97, 0.5); }
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        .pelicans-badge {
+        .pelicans-section::after {
+            content: '';
             position: absolute;
-            top: -10px;
-            right: 20px;
-            background: linear-gradient(135deg, #C8A961 0%, #B4975A 100%);
-            color: #0C2340;
+            top: -100px;
+            right: -100px;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(200, 169, 97, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .pels-header {
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .pels-title {
             font-family: 'Righteous', cursive;
-            font-size: 12px;
-            padding: 8px 20px;
-            border-radius: 20px;
+            font-size: 28px;
+            background: linear-gradient(135deg, #C8A961 0%, #E8D9A0 50%, #C8A961 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            box-shadow: 0 4px 15px rgba(200, 169, 97, 0.5);
-            z-index: 10;
-            animation: bounce 1s ease-in-out infinite;
+            letter-spacing: 3px;
+            text-shadow: 0 0 30px rgba(200, 169, 97, 0.5);
         }
 
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
+        .pels-record {
+            font-size: 12px;
+            color: #6B8299;
+            margin-top: 5px;
+            letter-spacing: 1px;
         }
 
-        .matchup {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .pels-streak {
+            display: inline-block;
+            background: linear-gradient(135deg, #2D5A27 0%, #1E3D1A 100%);
+            color: #7FBF7F;
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+
+        .pels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
             position: relative;
             z-index: 1;
         }
 
-        .team {
-            flex: 1;
-            text-align: center;
+        .pels-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(200, 169, 97, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
         }
 
-        /* 70s Style Retro Logo */
-        .retro-logo {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
+        .pels-card-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #C8A961;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-family: 'Righteous', cursive;
-            font-size: 20px;
-            color: white;
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
-            margin: 0 auto 10px;
-            border: 4px solid rgba(255,255,255,0.3);
-            box-shadow:
-                0 4px 15px rgba(0,0,0,0.4),
-                inset 0 -3px 10px rgba(0,0,0,0.3),
-                inset 0 3px 10px rgba(255,255,255,0.2);
-            position: relative;
+            gap: 6px;
         }
 
-        .retro-logo::after {
+        .pels-card-title::before {
             content: '';
-            position: absolute;
-            top: 5px;
-            left: 10px;
-            width: 20px;
-            height: 10px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 50%;
-            transform: rotate(-30deg);
+            width: 3px;
+            height: 12px;
+            background: #E31837;
+            border-radius: 2px;
         }
 
-        .team-name {
-            font-family: 'Righteous', cursive;
-            font-size: 16px;
-            text-transform: uppercase;
-            line-height: 1.3;
+        /* Next Games */
+        .next-game {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+        }
+
+        .next-game:last-child {
+            border-bottom: none;
+        }
+
+        .next-game-opponent {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .next-game-home {
+            color: #7FBF7F;
+        }
+
+        .next-game-away {
+            color: #BF7F7F;
+        }
+
+        .next-game-info {
+            text-align: right;
+            font-size: 11px;
+            color: #6B8299;
+        }
+
+        /* Hot Players */
+        .hot-player {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+        }
+
+        .hot-player:last-child {
+            border-bottom: none;
+        }
+
+        .hot-player-name {
+            font-weight: 600;
+            font-size: 12px;
+            color: #E8D9A0;
+        }
+
+        .hot-player-stat {
+            font-size: 11px;
+            color: #C8A961;
+        }
+
+        .hot-player-value {
+            font-weight: 700;
             color: #fff;
         }
 
-        .injuries {
-            margin-top: 8px;
+        /* Injury Report */
+        .injury-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 11px;
         }
 
-        .injured {
-            display: inline-block;
-            background: #c0392b;
-            color: white;
+        .injury-name {
+            color: #ccc;
+        }
+
+        .injury-status {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .injury-out {
+            background: #5C1F1F;
+            color: #E87777;
+        }
+
+        .injury-questionable {
+            background: #5C4A1F;
+            color: #E8C777;
+        }
+
+        /* Game Results */
+        .game-result {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+        }
+
+        .game-result:last-child {
+            border-bottom: none;
+        }
+
+        .game-result-opponent {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .game-result-win {
+            color: #7FBF7F;
+        }
+
+        .game-result-loss {
+            color: #BF7F7F;
+        }
+
+        .game-result-info {
+            text-align: right;
             font-size: 11px;
-            padding: 3px 10px;
-            border-radius: 15px;
-            margin: 2px;
+        }
+
+        .game-result-score {
+            font-weight: 700;
+            color: #E8D9A0;
+        }
+
+        .game-result-date {
+            color: #6B8299;
+            font-size: 10px;
+        }
+
+        /* Draft picks */
+        .cap-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+        }
+
+        .cap-item:last-child {
+            border-bottom: none;
+        }
+
+        .cap-label {
+            color: #6B8299;
+        }
+
+        .cap-value {
+            color: #C8A961;
             font-weight: 600;
         }
 
-        .vs-section {
-            text-align: center;
-            padding: 0 10px;
+        .cap-warning {
+            color: #E87777;
         }
 
-        .at-symbol {
-            font-family: 'Righteous', cursive;
-            font-size: 28px;
-            color: #f77f00;
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+        .cap-good {
+            color: #7FBF7F;
         }
 
-        .game-time {
+        /* YouTube Link */
+        .youtube-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #E31837 0%, #B31530 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-weight: 600;
             font-size: 13px;
-            color: rgba(255,255,255,0.8);
-            margin: 8px 0;
-            white-space: nowrap;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(227, 24, 55, 0.4);
         }
 
-        .network {
-            font-family: 'Righteous', cursive;
-            font-size: 14px;
-            color: #f77f00;
+        .youtube-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(227, 24, 55, 0.6);
+        }
+
+        .youtube-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Fun Facts */
+        .fun-fact {
+            background: linear-gradient(135deg, rgba(200, 169, 97, 0.15) 0%, rgba(200, 169, 97, 0.05) 100%);
+            border-left: 3px solid #C8A961;
+            padding: 10px 12px;
+            margin-top: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .fun-fact-label {
+            font-size: 9px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            background: rgba(247, 127, 0, 0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
+            color: #C8A961;
+            margin-bottom: 3px;
         }
 
-        .no-games {
-            font-family: 'Righteous', cursive;
-            font-size: 24px;
-            color: #f77f00;
+        .fun-fact-text {
+            font-size: 12px;
+            color: #E8D9A0;
+            line-height: 1.4;
+        }
+
+        /* Full Width Cards */
+        .pels-card-full {
+            grid-column: 1 / -1;
+        }
+
+        .pels-youtube-section {
             text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            padding: 60px 20px;
-            background: linear-gradient(135deg, #3d2914 0%, #2a1a0a 100%);
-            border-radius: 30px;
-            border: 3px solid #5a3d20;
+            padding: 15px 0 5px;
         }
 
-        footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            color: #5a3d20;
-            padding-bottom: 20px;
-        }
-
-        /* Decorative curves at bottom */
-        .wave-decoration {
-            height: 60px;
-            margin-top: 40px;
-            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 100'%3E%3Cpath fill='%23f77f00' fill-opacity='0.3' d='M0,50 C360,100 720,0 1080,50 C1260,75 1380,50 1440,50 L1440,100 L0,100 Z'/%3E%3C/svg%3E") repeat-x;
-            background-size: 100% 100%;
-        }
-
-        /* Mobile responsiveness */
         @media (max-width: 600px) {
-            .matchup {
+            .tv-games {
                 flex-direction: column;
-                gap: 20px;
-            }
-
-            .team {
-                display: flex;
+                gap: 12px;
                 align-items: center;
-                gap: 15px;
-                text-align: left;
             }
 
-            .team.home {
-                flex-direction: row-reverse;
-                text-align: right;
+            .pels-grid {
+                grid-template-columns: 1fr;
             }
 
-            .retro-logo {
-                margin: 0;
-                width: 60px;
-                height: 60px;
-                font-size: 18px;
-            }
-
-            .vs-section {
-                padding: 10px 0;
-                border-top: 1px solid rgba(247, 127, 0, 0.3);
-                border-bottom: 1px solid rgba(247, 127, 0, 0.3);
-                width: 100%;
-            }
-
-            .at-symbol {
-                display: none;
+            .pels-title {
+                font-size: 22px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>NBA Tonight</h1>
-            <div class="subtitle">Peacock • Prime • ABC • NBC</div>
-        </header>
-        <div class="date">${dateStr}</div>
-        <div id="games">
-            ${gamesHtml}
+    <!-- MINIMAL TV SCHEDULE -->
+    <section class="tv-section">
+        <div class="tv-header">nba tonight</div>
+        <div class="tv-date">${dateStr}</div>
+        <div class="tv-games">
+            ${tvGamesHtml}
         </div>
-        <div class="wave-decoration"></div>
-        <footer>Updated Daily • Add to Home Screen for App Experience</footer>
-    </div>
+    </section>
+
+    <!-- PELICANS CELEBRATION -->
+    <section class="pelicans-section">
+        <div class="pels-header">
+            <div class="pels-title">Pelicans Central</div>
+            <div class="pels-record">
+                10-35
+                <span class="pels-streak" style="background: linear-gradient(135deg, #5C1F1F 0%, #3D1515 100%); color: #E87777;">L2</span>
+            </div>
+        </div>
+
+        <div class="pels-grid">
+            <!-- Last 3 Games -->
+            <div class="pels-card">
+                <div class="pels-card-title">Last 3 Games</div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-loss">@ Rockets</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">L 110-119</div>
+                        <div class="game-result-date">Sat 1/18</div>
+                    </div>
+                </div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-loss">@ Pacers</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">L 119-127</div>
+                        <div class="game-result-date">Fri 1/16</div>
+                    </div>
+                </div>
+                <div class="game-result">
+                    <span class="game-result-opponent game-result-win">vs Nets</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">W 116-113</div>
+                        <div class="game-result-date">Wed 1/14</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next 3 Games -->
+            <div class="pels-card">
+                <div class="pels-card-title">Next 3 Games</div>
+                <div class="next-game">
+                    <span class="next-game-opponent next-game-home">vs Pistons</span>
+                    <span class="next-game-info">Wed 1/21 - 7:00 PM</span>
+                </div>
+                <div class="next-game">
+                    <span class="next-game-opponent next-game-home">vs Grizzlies</span>
+                    <span class="next-game-info">Fri 1/30 - 6:30 PM</span>
+                </div>
+                <div class="next-game">
+                    <span class="next-game-opponent next-game-away">@ 76ers</span>
+                    <span class="next-game-info">Sat 1/31 - 7:30 PM</span>
+                </div>
+            </div>
+
+            <!-- Sound Like You Know - Now after games -->
+            <div class="pels-card pels-card-full">
+                <div class="pels-card-title">Sound Like You Know</div>
+                ${talkingPointsHtml}
+            </div>
+
+            <!-- Hot Players Last 10 -->
+            <div class="pels-card">
+                <div class="pels-card-title">Hot Over Last 10 Games</div>
+                <div class="hot-player">
+                    <span class="hot-player-name">Trey Murphy III</span>
+                    <span class="hot-player-stat">Scoring: <span class="hot-player-value">42 pts</span> high</span>
+                </div>
+                <div class="hot-player">
+                    <span class="hot-player-name">Zion Williamson</span>
+                    <span class="hot-player-stat">Avg: <span class="hot-player-value">26.2 ppg</span></span>
+                </div>
+                <div class="hot-player">
+                    <span class="hot-player-name">Derik Queen</span>
+                    <span class="hot-player-stat">Reb high: <span class="hot-player-value">16 reb</span></span>
+                </div>
+                <div class="hot-player">
+                    <span class="hot-player-name">Herb Jones</span>
+                    <span class="hot-player-stat">Steals high: <span class="hot-player-value">8 stl</span></span>
+                </div>
+            </div>
+
+            <!-- Injury Report -->
+            <div class="pels-card">
+                <div class="pels-card-title">Injury Report</div>
+                <div class="injury-item">
+                    <span class="injury-name">Herb Jones</span>
+                    <span class="injury-status injury-out">Out - Ankle</span>
+                </div>
+                <div class="injury-item">
+                    <span class="injury-name">Dejounte Murray</span>
+                    <span class="injury-status injury-out">Out</span>
+                </div>
+                <div class="injury-item">
+                    <span class="injury-name">Jose Alvarado</span>
+                    <span class="injury-status injury-out">Out</span>
+                </div>
+                <div class="injury-item">
+                    <span class="injury-name">Trey Murphy III</span>
+                    <span class="injury-status injury-questionable">GTD - Back</span>
+                </div>
+            </div>
+
+            <!-- Draft Capital -->
+            <div class="pels-card">
+                <div class="pels-card-title">Draft Capital</div>
+                ${draftCapitalHtml}
+            </div>
+
+            <!-- YouTube Section -->
+            <div class="pels-card pels-card-full pels-youtube-section">
+                <a href="${youtubeUrl}" target="_blank" class="youtube-link">
+                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    Search Pelicans on NBA YouTube
+                </a>
+            </div>
+        </div>
+    </section>
 </body>
 </html>`;
 }

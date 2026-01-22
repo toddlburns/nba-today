@@ -89,6 +89,12 @@
             text-transform: uppercase;
         }
 
+        .tv-no-games {
+            text-align: center;
+            color: #555;
+            font-size: 13px;
+        }
+
         /* ===== PELICANS SECTION ===== */
         .pelicans-section {
             background: linear-gradient(180deg, #0C2340 0%, #071428 50%, #0C2340 100%);
@@ -403,23 +409,6 @@
             line-height: 1.4;
         }
 
-        /* Power Rankings Badge */
-        .power-rank {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: rgba(200, 169, 97, 0.2);
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            margin-top: 8px;
-        }
-
-        .power-rank-num {
-            font-weight: 700;
-            color: #E31837;
-        }
-
         /* Full Width Cards */
         .pels-card-full {
             grid-column: 1 / -1;
@@ -451,17 +440,18 @@
     <!-- MINIMAL TV SCHEDULE -->
     <section class="tv-section">
         <div class="tv-header">nba tonight</div>
-        <div class="tv-date">Tuesday, January 20, 2026</div>
+        <div class="tv-date">Wednesday, January 21, 2026</div>
         <div class="tv-games">
+            
             <div class="tv-game">
-                <span class="tv-teams">Spurs <span class="tv-at">@</span> Rockets</span>
-                <span class="tv-time">8:00 PM</span>
-                <span class="tv-network">NBC</span>
+                <span class="tv-teams">GSW <span class="tv-at">@</span> DAL</span>
+                <span class="tv-time">4:30 PM</span>
+                <span class="tv-network">Prime Video</span>
             </div>
             <div class="tv-game">
-                <span class="tv-teams">Lakers <span class="tv-at">@</span> Nuggets</span>
-                <span class="tv-time">10:00 PM</span>
-                <span class="tv-network">NBC</span>
+                <span class="tv-teams">LAL <span class="tv-at">@</span> CLI</span>
+                <span class="tv-time">7:00 PM</span>
+                <span class="tv-network">Prime Video</span>
             </div>
         </div>
     </section>
@@ -474,16 +464,6 @@
                 10-35
                 <span class="pels-streak" style="background: linear-gradient(135deg, #5C1F1F 0%, #3D1515 100%); color: #E87777;">L2</span>
             </div>
-        </div>
-
-        <!-- YouTube Section - Above boxes -->
-        <div class="pels-youtube-section" style="margin-bottom: 20px;">
-            <a href="https://www.youtube.com/@NBA" target="_blank" class="youtube-link">
-                <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
-                Watch Latest Pelicans Highlights on NBA YouTube
-            </a>
         </div>
 
         <div class="pels-grid">
@@ -528,6 +508,16 @@
                     <span class="next-game-opponent next-game-away">@ 76ers</span>
                     <span class="next-game-info">Sat 1/31 - 7:30 PM</span>
                 </div>
+            </div>
+
+            <!-- Sound Like You Know - Now after games -->
+            <div class="pels-card pels-card-full">
+                <div class="pels-card-title">Sound Like You Know</div>
+                
+            <div class="fun-fact">
+                <div class="fun-fact-label">The Streak</div>
+                <div class="fun-fact-text">After a 2-10 start and Willie Green firing, James Borrego won 5 straight before a 1-10 slide. Zion is averaging 26.2 ppg since returning from injury.</div>
+            </div>
             </div>
 
             <!-- Hot Players Last 10 -->
@@ -575,39 +565,33 @@
             <!-- Draft Capital -->
             <div class="pels-card">
                 <div class="pels-card-title">Draft Capital</div>
-                <div class="cap-item">
-                    <span class="cap-label">2026 1st Round</span>
-                    <span class="cap-value cap-warning">Traded to ATL</span>
-                </div>
-                <div class="cap-item">
-                    <span class="cap-label">2027 1st Round</span>
-                    <span class="cap-value cap-good">Better of NOP/MIL</span>
-                </div>
-                <div class="cap-item">
-                    <span class="cap-label">ATL owns swap rights</span>
-                    <span class="cap-value">2027 (1-4 protected)</span>
-                </div>
-                <div class="fun-fact">
-                    <div class="fun-fact-label">Draft Intel</div>
-                    <div class="fun-fact-text">Hawks have 52% chance at a top-4 pick from the NOP pick. Could land Dybantsa or Boozer.</div>
-                </div>
+                
+            <div class="cap-item">
+                <span class="cap-label">2026 1st Round</span>
+                <span class="cap-value cap-warning">Traded to ATL</span>
+            </div>
+            <div class="cap-item">
+                <span class="cap-label">2027 1st Round</span>
+                <span class="cap-value cap-good">Better of NOP/MIL</span>
+            </div>
+            <div class="cap-item">
+                <span class="cap-label">2027 Swap Rights</span>
+                <span class="cap-value ">ATL owns (1-4 protected)</span>
+            </div>
+            <div class="fun-fact">
+                <div class="fun-fact-label">Draft Intel</div>
+                <div class="fun-fact-text">Hawks have 52% chance at a top-4 pick from the NOP pick. Could land Dybantsa or Boozer.</div>
+            </div>
             </div>
 
-            <!-- Talking Points -->
-            <div class="pels-card">
-                <div class="pels-card-title">Sound Like You Know</div>
-                <div class="fun-fact">
-                    <div class="fun-fact-label">The Streak</div>
-                    <div class="fun-fact-text">After a 2-10 start and Willie Green firing, James Borrego won 5 straight before a 1-10 slide. Now they're on a 4-game heater.</div>
-                </div>
-                <div class="fun-fact">
-                    <div class="fun-fact-label">Rookie Watch</div>
-                    <div class="fun-fact-text">Derik Queen had a triple-double-adjacent game: 14 pts, 16 reb, 12 ast, 5 blk vs the Wizards. The trade up was worth it.</div>
-                </div>
-                <div class="fun-fact">
-                    <div class="fun-fact-label">Trey Day</div>
-                    <div class="fun-fact-text">Trey Murphy III dropped 42 on the Lakers on New Year's Day. He's been the go-to scorer with all the injuries.</div>
-                </div>
+            <!-- YouTube Section -->
+            <div class="pels-card pels-card-full pels-youtube-section">
+                <a href="https://www.youtube.com/@NBA/search?query=pelicans" target="_blank" class="youtube-link">
+                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    Search Pelicans on NBA YouTube
+                </a>
             </div>
         </div>
     </section>

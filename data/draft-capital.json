@@ -1,0 +1,27 @@
+{
+  "lastUpdated": "2026-01-01",
+  "picks": [
+    {
+      "year": "2026",
+      "round": "1st Round",
+      "status": "Traded to ATL",
+      "statusClass": "cap-warning"
+    },
+    {
+      "year": "2027",
+      "round": "1st Round",
+      "status": "Better of NOP/MIL",
+      "statusClass": "cap-good"
+    },
+    {
+      "year": "2027",
+      "round": "Swap Rights",
+      "status": "ATL owns (1-4 protected)",
+      "statusClass": ""
+    }
+  ],
+  "intel": {
+    "label": "Draft Intel",
+    "text": "Hawks have 52% chance at a top-4 pick from the NOP pick. Could land Dybantsa or Boozer."
+  }
+}
