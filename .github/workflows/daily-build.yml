@@ -1,12 +1,11 @@
 name: Daily NBA Build                                                                                      
                                                                                                              
-  on:                                                                                                        
+on:                                                                                                        
     schedule:                                                                                                
-      # Run at 12 AM PST (8 AM UTC) every day                                                                
       - cron: '0 8 * * *'                                                                                    
-    workflow_dispatch: # Allow manual triggers                                                               
+    workflow_dispatch:                                                                                       
                                                                                                              
-  jobs:                                                                                                      
+jobs:                                                                                                      
     build:                                                                                                   
       runs-on: ubuntu-latest                                                                                 
                                                                                                              
@@ -28,4 +27,4 @@ name: Daily NBA Build
             git config --local user.name "GitHub Action"                                                     
             git add index.html                                                                               
             git diff --staged --quiet || git commit -m "Daily update for $(date +'%Y-%m-%d')"                
-            git push
+            git push     
