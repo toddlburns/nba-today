@@ -1,0 +1,31 @@
+name: Daily NBA Build                                                                                      
+                                                                                                             
+  on:                                                                                                        
+    schedule:                                                                                                
+      # Run at 12 AM PST (8 AM UTC) every day                                                                
+      - cron: '0 8 * * *'                                                                                    
+    workflow_dispatch: # Allow manual triggers                                                               
+                                                                                                             
+  jobs:                                                                                                      
+    build:                                                                                                   
+      runs-on: ubuntu-latest                                                                                 
+                                                                                                             
+      steps:                                                                                                 
+        - name: Checkout repository                                                                          
+          uses: actions/checkout@v4                                                                          
+                                                                                                             
+        - name: Setup Node.js                                                                                
+          uses: actions/setup-node@v4                                                                        
+          with:                                                                                              
+            node-version: '20'                                                                               
+                                                                                                             
+        - name: Run build script                                                                             
+          run: node build.js                                                                                 
+                                                                                                             
+        - name: Commit and push changes                                                                      
+          run: |                                                                                             
+            git config --local user.email "action@github.com"                                                
+            git config --local user.name "GitHub Action"                                                     
+            git add index.html                                                                               
+            git diff --staged --quiet || git commit -m "Daily update for $(date +'%Y-%m-%d')"                
+            git push
