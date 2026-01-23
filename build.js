@@ -7,6 +7,7 @@ const EXCLUDED_NETWORKS = ['ESPN', 'NBA TV', 'NBATV'];
 
 // Your favorite team
 const FAVORITE_TEAM = 'Pelicans';
+const FAVORITE_TEAM_ID = 1610612740; // New Orleans Pelicans team ID
 
 // Team abbreviations for retro logos
 const TEAM_ABBREVS = {
@@ -75,6 +76,32 @@ function formatDate() {
     });
 }
 
+function formatShortDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'numeric',
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
+    });
+}
+
+function formatGameDateTime(dateStr) {
+    const date = new Date(dateStr);
+    const dayPart = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'numeric',
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
+    });
+    const timePart = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'America/Los_Angeles'
+    });
+    return `${dayPart} - ${timePart}`;
+}
+
 function getTodayDateString() {
     // Get today's date in PST timezone to match display (format: MM/DD/YYYY)
     const now = new Date();
@@ -88,6 +115,10 @@ function getTodayDateString() {
 function getTeamAbbrev(city, name) {
     const fullName = `${city} ${name}`;
     return TEAM_ABBREVS[fullName] || name.substring(0, 3).toUpperCase();
+}
+
+function getTeamName(city, name) {
+    return name; // Just return the team name (e.g., "Rockets", "Pelicans")
 }
 
 function isWantedNetwork(networkName) {
@@ -107,6 +138,99 @@ function loadJsonFile(path) {
     }
 }
 
+function isPelicansGame(game) {
+    return game.homeTeam.teamId === FAVORITE_TEAM_ID || game.awayTeam.teamId === FAVORITE_TEAM_ID;
+}
+
+function getPelicansGames(scheduleData) {
+    const now = new Date();
+    const allGames = [];
+
+    // Collect all Pelicans games from all game dates
+    for (const gameDay of scheduleData.leagueSchedule.gameDates) {
+        for (const game of gameDay.games) {
+            if (isPelicansGame(game)) {
+                allGames.push(game);
+            }
+        }
+    }
+
+    // Separate into past and future games
+    const pastGames = [];
+    const futureGames = [];
+
+    for (const game of allGames) {
+        const gameDate = new Date(game.gameDateTimeUTC);
+        const gameStatus = game.gameStatus; // 1 = scheduled, 2 = in progress, 3 = final
+
+        if (gameStatus === 3) {
+            // Game is final - it's a past game
+            pastGames.push(game);
+        } else if (gameStatus === 1 && gameDate > now) {
+            // Game is scheduled and in the future
+            futureGames.push(game);
+        }
+    }
+
+    // Sort past games by date descending (most recent first)
+    pastGames.sort((a, b) => new Date(b.gameDateTimeUTC) - new Date(a.gameDateTimeUTC));
+
+    // Sort future games by date ascending (soonest first)
+    futureGames.sort((a, b) => new Date(a.gameDateTimeUTC) - new Date(b.gameDateTimeUTC));
+
+    return {
+        last3: pastGames.slice(0, 3),
+        next3: futureGames.slice(0, 3)
+    };
+}
+
+function generateLast3GamesHtml(games) {
+    if (!games || games.length === 0) {
+        return '<div class="game-result"><span class="game-result-opponent">No recent games</span></div>';
+    }
+
+    return games.map(game => {
+        const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+        const opponent = isPelicansHome ? game.awayTeam : game.homeTeam;
+        const pelicansScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
+        const opponentScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
+        const isWin = pelicansScore > opponentScore;
+        const prefix = isPelicansHome ? 'vs' : '@';
+        const resultClass = isWin ? 'game-result-win' : 'game-result-loss';
+        const resultText = isWin ? 'W' : 'L';
+        const dateStr = formatShortDate(game.gameDateTimeUTC);
+
+        return `
+                <div class="game-result">
+                    <span class="game-result-opponent ${resultClass}">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</span>
+                    <div class="game-result-info">
+                        <div class="game-result-score">${resultText} ${pelicansScore}-${opponentScore}</div>
+                        <div class="game-result-date">${dateStr}</div>
+                    </div>
+                </div>`;
+    }).join('');
+}
+
+function generateNext3GamesHtml(games) {
+    if (!games || games.length === 0) {
+        return '<div class="next-game"><span class="next-game-opponent">No upcoming games</span></div>';
+    }
+
+    return games.map(game => {
+        const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+        const opponent = isPelicansHome ? game.awayTeam : game.homeTeam;
+        const prefix = isPelicansHome ? 'vs' : '@';
+        const locationClass = isPelicansHome ? 'next-game-home' : 'next-game-away';
+        const dateTimeStr = formatGameDateTime(game.gameDateTimeUTC);
+
+        return `
+                <div class="next-game">
+                    <span class="next-game-opponent ${locationClass}">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</span>
+                    <span class="next-game-info">${dateTimeStr}</span>
+                </div>`;
+    }).join('');
+}
+
 async function buildPage() {
     const dateStr = formatDate();
     const todayMatch = getTodayDateString();
@@ -119,10 +243,20 @@ async function buildPage() {
 
     let tvGamesHtml = '';
     let hasGames = false;
+    let last3GamesHtml = '';
+    let next3GamesHtml = '';
 
     try {
         const scheduleData = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
 
+        // Get Pelicans games
+        const pelicansGames = getPelicansGames(scheduleData);
+        last3GamesHtml = generateLast3GamesHtml(pelicansGames.last3);
+        next3GamesHtml = generateNext3GamesHtml(pelicansGames.next3);
+
+        console.log(`Found ${pelicansGames.last3.length} past games and ${pelicansGames.next3.length} upcoming games for Pelicans`);
+
+        // Get today's TV games
         const gameDay = scheduleData.leagueSchedule.gameDates.find(gd =>
             gd.gameDate.startsWith(todayMatch)
         );
@@ -165,6 +299,8 @@ async function buildPage() {
     } catch (error) {
         console.error('Error fetching games:', error);
         tvGamesHtml = `<div class="tv-no-games">Couldn't load schedule</div>`;
+        last3GamesHtml = '<div class="game-result"><span class="game-result-opponent">Couldn\'t load games</span></div>';
+        next3GamesHtml = '<div class="next-game"><span class="next-game-opponent">Couldn\'t load games</span></div>';
     }
 
     // Generate talking points HTML (only one item)
@@ -196,12 +332,12 @@ async function buildPage() {
     }
 
     // Generate the full HTML
-    const html = generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml);
+    const html = generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, draftCapitalHtml);
     fs.writeFileSync('index.html', html);
     console.log('Page built successfully for', dateStr);
 }
 
-function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml) {
+function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, draftCapitalHtml) {
     // YouTube search URL for Pelicans sorted by most recent uploads
     const youtubeUrl = 'https://www.youtube.com/@NBA/search?query=pelicans';
 
@@ -657,57 +793,32 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
     <section class="pelicans-section">
         <div class="pels-header">
             <div class="pels-title">Pelicans Central</div>
-            <div class="pels-record">
-                10-35
-                <span class="pels-streak" style="background: linear-gradient(135deg, #5C1F1F 0%, #3D1515 100%); color: #E87777;">L2</span>
-            </div>
         </div>
 
         <div class="pels-grid">
             <!-- Last 3 Games -->
             <div class="pels-card">
                 <div class="pels-card-title">Last 3 Games</div>
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-loss">@ Rockets</span>
-                    <div class="game-result-info">
-                        <div class="game-result-score">L 110-119</div>
-                        <div class="game-result-date">Sat 1/18</div>
-                    </div>
-                </div>
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-loss">@ Pacers</span>
-                    <div class="game-result-info">
-                        <div class="game-result-score">L 119-127</div>
-                        <div class="game-result-date">Fri 1/16</div>
-                    </div>
-                </div>
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-win">vs Nets</span>
-                    <div class="game-result-info">
-                        <div class="game-result-score">W 116-113</div>
-                        <div class="game-result-date">Wed 1/14</div>
-                    </div>
-                </div>
+                ${last3GamesHtml}
             </div>
 
             <!-- Next 3 Games -->
             <div class="pels-card">
                 <div class="pels-card-title">Next 3 Games</div>
-                <div class="next-game">
-                    <span class="next-game-opponent next-game-home">vs Pistons</span>
-                    <span class="next-game-info">Wed 1/21 - 7:00 PM</span>
-                </div>
-                <div class="next-game">
-                    <span class="next-game-opponent next-game-home">vs Grizzlies</span>
-                    <span class="next-game-info">Fri 1/30 - 6:30 PM</span>
-                </div>
-                <div class="next-game">
-                    <span class="next-game-opponent next-game-away">@ 76ers</span>
-                    <span class="next-game-info">Sat 1/31 - 7:30 PM</span>
-                </div>
+                ${next3GamesHtml}
             </div>
 
-            <!-- Sound Like You Know - Now after games -->
+            <!-- YouTube Section - Right after Next 3 Games -->
+            <div class="pels-card pels-card-full pels-youtube-section">
+                <a href="${youtubeUrl}" target="_blank" class="youtube-link">
+                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    Search Pelicans on NBA YouTube
+                </a>
+            </div>
+
+            <!-- Sound Like You Know -->
             <div class="pels-card pels-card-full">
                 <div class="pels-card-title">Sound Like You Know</div>
                 ${talkingPointsHtml}
@@ -759,16 +870,6 @@ function generateHTML(dateStr, tvGamesHtml, talkingPointsHtml, draftCapitalHtml)
             <div class="pels-card">
                 <div class="pels-card-title">Draft Capital</div>
                 ${draftCapitalHtml}
-            </div>
-
-            <!-- YouTube Section -->
-            <div class="pels-card pels-card-full pels-youtube-section">
-                <a href="${youtubeUrl}" target="_blank" class="youtube-link">
-                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    Search Pelicans on NBA YouTube
-                </a>
             </div>
         </div>
     </section>
