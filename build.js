@@ -158,6 +158,8 @@ function getPelicansGames(scheduleData) {
     // Separate into past and future games
     const pastGames = [];
     const futureGames = [];
+    let wins = 0;
+    let losses = 0;
 
     for (const game of allGames) {
         const gameDate = new Date(game.gameDateTimeUTC);
@@ -166,6 +168,15 @@ function getPelicansGames(scheduleData) {
         if (gameStatus === 3) {
             // Game is final - it's a past game
             pastGames.push(game);
+            // Calculate record
+            const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+            const pelicansScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
+            const opponentScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
+            if (pelicansScore > opponentScore) {
+                wins++;
+            } else {
+                losses++;
+            }
         } else if (gameStatus === 1 && gameDate > now) {
             // Game is scheduled and in the future
             futureGames.push(game);
@@ -180,7 +191,8 @@ function getPelicansGames(scheduleData) {
 
     return {
         last3: pastGames.slice(0, 3),
-        next3: futureGames.slice(0, 3)
+        next3: futureGames.slice(0, 3),
+        record: { wins, losses }
     };
 }
 
@@ -245,6 +257,7 @@ async function buildPage() {
     let hasGames = false;
     let last3GamesHtml = '';
     let next3GamesHtml = '';
+    let recordStr = '';
 
     try {
         const scheduleData = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
@@ -253,8 +266,10 @@ async function buildPage() {
         const pelicansGames = getPelicansGames(scheduleData);
         last3GamesHtml = generateLast3GamesHtml(pelicansGames.last3);
         next3GamesHtml = generateNext3GamesHtml(pelicansGames.next3);
+        recordStr = `${pelicansGames.record.wins}-${pelicansGames.record.losses}`;
 
         console.log(`Found ${pelicansGames.last3.length} past games and ${pelicansGames.next3.length} upcoming games for Pelicans`);
+        console.log(`Pelicans record: ${recordStr}`);
 
         // Get today's TV games
         const gameDay = scheduleData.leagueSchedule.gameDates.find(gd =>
@@ -332,12 +347,12 @@ async function buildPage() {
     }
 
     // Generate the full HTML
-    const html = generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, draftCapitalHtml);
+    const html = generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr);
     fs.writeFileSync('index.html', html);
     console.log('Page built successfully for', dateStr);
 }
 
-function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, draftCapitalHtml) {
+function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr) {
     // YouTube search URL for Pelicans sorted by most recent uploads
     const youtubeUrl = 'https://www.youtube.com/@NBA/search?query=pelicans';
 
@@ -474,6 +489,13 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
             z-index: 1;
         }
 
+        .pels-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
         .pels-title {
             font-family: 'Righteous', cursive;
             font-size: 28px;
@@ -484,6 +506,43 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
             text-transform: uppercase;
             letter-spacing: 3px;
             text-shadow: 0 0 30px rgba(200, 169, 97, 0.5);
+        }
+
+        .refresh-btn {
+            background: rgba(200, 169, 97, 0.2);
+            border: 1px solid rgba(200, 169, 97, 0.4);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(200, 169, 97, 0.4);
+            transform: scale(1.1);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .refresh-btn.spinning svg {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: #C8A961;
         }
 
         .pels-record {
@@ -792,7 +851,13 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
     <!-- PELICANS CELEBRATION -->
     <section class="pelicans-section">
         <div class="pels-header">
-            <div class="pels-title">Pelicans Central</div>
+            <div class="pels-title-row">
+                <div class="pels-title">Pelicans Central</div>
+                <button class="refresh-btn" id="refresh-btn" title="Refresh page">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </button>
+            </div>
+            <div class="pels-record">${recordStr}</div>
         </div>
 
         <div class="pels-grid">
@@ -824,27 +889,6 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
                 ${talkingPointsHtml}
             </div>
 
-            <!-- Hot Players Last 10 -->
-            <div class="pels-card">
-                <div class="pels-card-title">Hot Over Last 10 Games</div>
-                <div class="hot-player">
-                    <span class="hot-player-name">Trey Murphy III</span>
-                    <span class="hot-player-stat">Scoring: <span class="hot-player-value">42 pts</span> high</span>
-                </div>
-                <div class="hot-player">
-                    <span class="hot-player-name">Zion Williamson</span>
-                    <span class="hot-player-stat">Avg: <span class="hot-player-value">26.2 ppg</span></span>
-                </div>
-                <div class="hot-player">
-                    <span class="hot-player-name">Derik Queen</span>
-                    <span class="hot-player-stat">Reb high: <span class="hot-player-value">16 reb</span></span>
-                </div>
-                <div class="hot-player">
-                    <span class="hot-player-name">Herb Jones</span>
-                    <span class="hot-player-stat">Steals high: <span class="hot-player-value">8 stl</span></span>
-                </div>
-            </div>
-
             <!-- Injury Report -->
             <div class="pels-card">
                 <div class="pels-card-title">Injury Report</div>
@@ -866,13 +910,15 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
                 </div>
             </div>
 
-            <!-- Draft Capital -->
-            <div class="pels-card">
-                <div class="pels-card-title">Draft Capital</div>
-                ${draftCapitalHtml}
-            </div>
         </div>
     </section>
+
+    <script>
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            this.classList.add('spinning');
+            location.reload(true);
+        });
+    </script>
 </body>
 </html>`;
 }
