@@ -823,12 +823,15 @@
             }).join('');
         }
 
+        const NBA_SCHEDULE_URL = 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json';
+        const CORS_PROXY = 'https://corsproxy.io/?';
+
         async function refreshData() {
             const btn = document.getElementById('refresh-btn');
             btn.classList.add('spinning');
 
             try {
-                const response = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
+                const response = await fetch(CORS_PROXY + encodeURIComponent(NBA_SCHEDULE_URL));
                 const scheduleData = await response.json();
 
                 const todayMatch = getTodayDateString();
@@ -870,7 +873,7 @@
         // Auto-load record on page load
         (async function() {
             try {
-                const response = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
+                const response = await fetch(CORS_PROXY + encodeURIComponent(NBA_SCHEDULE_URL));
                 const scheduleData = await response.json();
                 const pelicansGames = getPelicansGames(scheduleData);
                 document.getElementById('pels-record').textContent = pelicansGames.record.wins + '-' + pelicansGames.record.losses;
