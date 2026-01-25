@@ -484,24 +484,9 @@
     <!-- MINIMAL TV SCHEDULE -->
     <section class="tv-section">
         <div class="tv-header">nba tonight</div>
-        <div class="tv-date">Saturday, January 24, 2026</div>
+        <div class="tv-date">Sunday, January 25, 2026</div>
         <div class="tv-games">
-            
-            <div class="tv-game">
-                <span class="tv-teams">NYK <span class="tv-at">@</span> PHI</span>
-                <span class="tv-time">12:00 PM</span>
-                <span class="tv-network">ABC</span>
-            </div>
-            <div class="tv-game">
-                <span class="tv-teams">GSW <span class="tv-at">@</span> MIN</span>
-                <span class="tv-time">2:30 PM</span>
-                <span class="tv-network">ABC</span>
-            </div>
-            <div class="tv-game">
-                <span class="tv-teams">LAL <span class="tv-at">@</span> DAL</span>
-                <span class="tv-time">5:30 PM</span>
-                <span class="tv-network">ABC</span>
-            </div>
+            <div class="tv-no-games">No games on your channels today</div>
         </div>
     </section>
 
@@ -608,111 +593,10 @@
     </section>
 
     <script>
-        // Networks to show
-        const WANTED_NETWORKS = ['ABC', 'NBC', 'PEACOCK', 'AMAZON', 'PRIME'];
-        const EXCLUDED_NETWORKS = ['ESPN', 'NBA TV', 'NBATV'];
-
-        const TEAM_ABBREVS = {
-            'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN',
-            'Charlotte Hornets': 'CHA', 'Chicago Bulls': 'CHI', 'Cleveland Cavaliers': 'CLE',
-            'Dallas Mavericks': 'DAL', 'Denver Nuggets': 'DEN', 'Detroit Pistons': 'DET',
-            'Golden State Warriors': 'GSW', 'Houston Rockets': 'HOU', 'Indiana Pacers': 'IND',
-            'Los Angeles Clippers': 'LAC', 'Los Angeles Lakers': 'LAL', 'Memphis Grizzlies': 'MEM',
-            'Miami Heat': 'MIA', 'Milwaukee Bucks': 'MIL', 'Minnesota Timberwolves': 'MIN',
-            'New Orleans Pelicans': 'NOP', 'New York Knicks': 'NYK', 'Oklahoma City Thunder': 'OKC',
-            'Orlando Magic': 'ORL', 'Philadelphia 76ers': 'PHI', 'Phoenix Suns': 'PHX',
-            'Portland Trail Blazers': 'POR', 'Sacramento Kings': 'SAC', 'San Antonio Spurs': 'SAS',
-            'Toronto Raptors': 'TOR', 'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
-        };
-
-        function getTeamAbbrev(city, name) {
-            return TEAM_ABBREVS[`${city} ${name}`] || name.substring(0, 3).toUpperCase();
-        }
-
-        function formatTime(dateStr) {
-            return new Date(dateStr).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                timeZone: 'America/Los_Angeles'
-            });
-        }
-
-        function isWantedNetwork(networkName) {
-            const upper = (networkName || '').toUpperCase();
-            if (EXCLUDED_NETWORKS.some(ex => upper.includes(ex.toUpperCase()))) return false;
-            return WANTED_NETWORKS.some(w => upper.includes(w));
-        }
-
-        function getTodayDateString() {
-            const now = new Date();
-            const options = { timeZone: 'America/Los_Angeles' };
-            const month = String(now.toLocaleString('en-US', { ...options, month: 'numeric' })).padStart(2, '0');
-            const day = String(now.toLocaleString('en-US', { ...options, day: 'numeric' })).padStart(2, '0');
-            const year = now.toLocaleString('en-US', { ...options, year: 'numeric' });
-            return `${month}/${day}/${year}`;
-        }
-
-        async function loadTVSchedule() {
-            const tvGamesEl = document.querySelector('.tv-games');
-            const tvDateEl = document.querySelector('.tv-date');
-
-            // Update date
-            tvDateEl.textContent = new Date().toLocaleDateString('en-US', {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                timeZone: 'America/Los_Angeles'
-            });
-
-            try {
-                const response = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
-                const data = await response.json();
-
-                const todayStr = getTodayDateString();
-                const todayGames = data.leagueSchedule.gameDates.find(d => d.gameDate === todayStr);
-
-                if (!todayGames) {
-                    tvGamesEl.innerHTML = '<div class="tv-no-games">No games today</div>';
-                    return;
-                }
-
-                const tvGames = todayGames.games.filter(game => {
-                    const broadcasters = game.broadcasters?.nationalTvBroadcasters || [];
-                    return broadcasters.some(b => isWantedNetwork(b.broadcasterDisplay));
-                });
-
-                if (tvGames.length === 0) {
-                    tvGamesEl.innerHTML = '<div class="tv-no-games">No national TV games today (ABC/NBC/Peacock/Prime)</div>';
-                    return;
-                }
-
-                tvGamesEl.innerHTML = tvGames.map(game => {
-                    const away = getTeamAbbrev(game.awayTeam.teamCity, game.awayTeam.teamName);
-                    const home = getTeamAbbrev(game.homeTeam.teamCity, game.homeTeam.teamName);
-                    const time = formatTime(game.gameDateTimeUTC);
-                    const network = game.broadcasters.nationalTvBroadcasters
-                        .filter(b => isWantedNetwork(b.broadcasterDisplay))
-                        .map(b => b.broadcasterAbbreviation || b.broadcasterDisplay)[0] || '';
-
-                    return `<div class="tv-game">
-                        <span class="tv-teams">${away} <span class="tv-at">@</span> ${home}</span>
-                        <span class="tv-time">${time}</span>
-                        <span class="tv-network">${network}</span>
-                    </div>`;
-                }).join('');
-            } catch (e) {
-                console.error('Failed to load TV schedule:', e);
-                tvGamesEl.innerHTML = '<div class="tv-no-games">Unable to load schedule</div>';
-            }
-        }
-
         document.getElementById('refresh-btn').addEventListener('click', function() {
             this.classList.add('spinning');
-            loadTVSchedule().then(() => {
-                setTimeout(() => this.classList.remove('spinning'), 500);
-            });
+            location.reload(true);
         });
-
-        // Load on page load
-        loadTVSchedule();
     </script>
 </body>
 </html>
