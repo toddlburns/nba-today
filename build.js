@@ -308,7 +308,7 @@ async function buildPage() {
         }
 
         if (!hasGames) {
-            tvGamesHtml = `<div class="tv-no-games">No games on your channels today</div>`;
+            tvGamesHtml = `<div class="tv-no-games">There are no national TV games today.</div>`;
         }
 
     } catch (error) {
