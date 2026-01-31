@@ -337,12 +337,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            border-left: 3px solid transparent;
         }
 
         .game-result:last-child {
-            border-bottom: none;
+            margin-bottom: 0;
         }
 
         .game-result-opponent {
@@ -351,10 +353,28 @@
         }
 
         .game-result-win {
+            background: rgba(60, 140, 60, 0.12);
+            border-left-color: #4CAF50;
+        }
+
+        .game-result-win .game-result-opponent {
+            color: #7FBF7F;
+        }
+
+        .game-result-win .game-result-score {
             color: #7FBF7F;
         }
 
         .game-result-loss {
+            background: rgba(160, 60, 60, 0.12);
+            border-left-color: #BF5B5B;
+        }
+
+        .game-result-loss .game-result-opponent {
+            color: #BF7F7F;
+        }
+
+        .game-result-loss .game-result-score {
             color: #BF7F7F;
         }
 
@@ -365,7 +385,6 @@
 
         .game-result-score {
             font-weight: 700;
-            color: #E8D9A0;
         }
 
         .game-result-date {
@@ -517,22 +536,22 @@
             <div class="pels-card">
                 <div class="pels-card-title">Last 3 Games</div>
                 
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-win">vs Grizzlies</span>
+                <div class="game-result game-result-win">
+                    <span class="game-result-opponent">vs Grizzlies</span>
                     <div class="game-result-info">
                         <div class="game-result-score">W 114-106</div>
                         <div class="game-result-date">Fri, 1/30</div>
                     </div>
                 </div>
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-loss">@ Thunder</span>
+                <div class="game-result game-result-loss">
+                    <span class="game-result-opponent">@ Thunder</span>
                     <div class="game-result-info">
                         <div class="game-result-score">L 95-104</div>
                         <div class="game-result-date">Tue, 1/27</div>
                     </div>
                 </div>
-                <div class="game-result">
-                    <span class="game-result-opponent game-result-win">@ Spurs</span>
+                <div class="game-result game-result-win">
+                    <span class="game-result-opponent">@ Spurs</span>
                     <div class="game-result-info">
                         <div class="game-result-score">W 104-95</div>
                         <div class="game-result-date">Sun, 1/25</div>
