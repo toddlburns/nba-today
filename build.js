@@ -213,8 +213,8 @@ function generateLast3GamesHtml(games) {
         const dateStr = formatShortDate(game.gameDateTimeUTC);
 
         return `
-                <div class="game-result">
-                    <span class="game-result-opponent ${resultClass}">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</span>
+                <div class="game-result ${resultClass}">
+                    <span class="game-result-opponent">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</span>
                     <div class="game-result-info">
                         <div class="game-result-score">${resultText} ${pelicansScore}-${opponentScore}</div>
                         <div class="game-result-date">${dateStr}</div>
@@ -695,12 +695,14 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(200, 169, 97, 0.1);
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            border-left: 3px solid transparent;
         }
 
         .game-result:last-child {
-            border-bottom: none;
+            margin-bottom: 0;
         }
 
         .game-result-opponent {
@@ -709,10 +711,28 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
         }
 
         .game-result-win {
+            background: rgba(60, 140, 60, 0.12);
+            border-left-color: #4CAF50;
+        }
+
+        .game-result-win .game-result-opponent {
+            color: #7FBF7F;
+        }
+
+        .game-result-win .game-result-score {
             color: #7FBF7F;
         }
 
         .game-result-loss {
+            background: rgba(160, 60, 60, 0.12);
+            border-left-color: #BF5B5B;
+        }
+
+        .game-result-loss .game-result-opponent {
+            color: #BF7F7F;
+        }
+
+        .game-result-loss .game-result-score {
             color: #BF7F7F;
         }
 
@@ -723,7 +743,6 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
 
         .game-result-score {
             font-weight: 700;
-            color: #E8D9A0;
         }
 
         .game-result-date {
