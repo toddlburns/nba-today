@@ -191,6 +191,7 @@ function getPelicansGames(scheduleData) {
 
     return {
         last3: pastGames.slice(0, 3),
+        last5: pastGames.slice(0, 5),
         next3: futureGames.slice(0, 3),
         record: { wins, losses }
     };
@@ -243,6 +244,148 @@ function generateNext3GamesHtml(games) {
     }).join('');
 }
 
+async function fetchBoxScore(gameId) {
+    const url = `https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${gameId}.json`;
+    const data = await fetch(url);
+    return data.game;
+}
+
+function generateAutoTalkingPoints(boxScore, recentGames) {
+    let lastGameHtml = '';
+    let recentHtml = '';
+
+    // Last Game tidbit
+    if (boxScore) {
+        try {
+            const isPelicansHome = boxScore.homeTeam.teamId === FAVORITE_TEAM_ID;
+            const pelTeam = isPelicansHome ? boxScore.homeTeam : boxScore.awayTeam;
+            const oppTeam = isPelicansHome ? boxScore.awayTeam : boxScore.homeTeam;
+            const isWin = pelTeam.score > oppTeam.score;
+            const margin = Math.abs(pelTeam.score - oppTeam.score);
+
+            // Find top Pelicans scorer
+            const players = pelTeam.players || [];
+            const topScorer = players.reduce((best, p) => {
+                const pts = p.statistics ? p.statistics.points : (p.points || 0);
+                const bestPts = best.statistics ? best.statistics.points : (best.points || 0);
+                return pts > bestPts ? p : best;
+            }, players[0]);
+
+            const topPts = topScorer?.statistics?.points ?? topScorer?.points ?? 0;
+            const topReb = topScorer?.statistics?.reboundsTotal ?? topScorer?.rebounds ?? 0;
+            const topAst = topScorer?.statistics?.assists ?? topScorer?.assists ?? 0;
+            const topName = topScorer?.name || topScorer?.firstName + ' ' + topScorer?.familyName || 'Unknown';
+
+            const result = isWin ? `${pelTeam.score}-${oppTeam.score} win` : `${pelTeam.score}-${oppTeam.score} loss`;
+            const oppName = oppTeam.teamName || 'opponent';
+            const prefix = isPelicansHome ? 'vs' : 'at';
+
+            let statLine = `${topPts} pts`;
+            if (topReb >= 5) statLine += `, ${topReb} reb`;
+            if (topAst >= 5) statLine += `, ${topAst} ast`;
+
+            lastGameHtml = `
+            <div class="fun-fact">
+                <div class="fun-fact-label">Last Game</div>
+                <div class="fun-fact-text">${topName} led with ${statLine} in a ${result} ${prefix} the ${oppName}.</div>
+            </div>`;
+        } catch (e) {
+            console.log('Error generating last game tidbit:', e.message);
+        }
+    }
+
+    // Recent stretch tidbit
+    if (recentGames && recentGames.length >= 2) {
+        try {
+            let wins = 0, losses = 0, totalPts = 0;
+            for (const game of recentGames) {
+                const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+                const pelScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
+                const oppScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
+                totalPts += pelScore;
+                if (pelScore > oppScore) wins++;
+                else losses++;
+            }
+            const avgPts = (totalPts / recentGames.length).toFixed(1);
+            const n = recentGames.length;
+
+            // Check for streak
+            let streakType = null;
+            let streakCount = 0;
+            for (const game of recentGames) {
+                const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+                const pelScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
+                const oppScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
+                const isWin = pelScore > oppScore;
+                if (streakType === null) {
+                    streakType = isWin;
+                    streakCount = 1;
+                } else if (isWin === streakType) {
+                    streakCount++;
+                } else {
+                    break;
+                }
+            }
+
+            let streakText = '';
+            if (streakCount >= 2) {
+                streakText = streakType ? `, currently on a ${streakCount}-game winning streak` : `, on a ${streakCount}-game losing skid`;
+            }
+
+            recentHtml = `
+            <div class="fun-fact">
+                <div class="fun-fact-label">Last ${n} Games</div>
+                <div class="fun-fact-text">The Pelicans are ${wins}-${losses} over their last ${n}, averaging ${avgPts} PPG${streakText}.</div>
+            </div>`;
+        } catch (e) {
+            console.log('Error generating recent tidbit:', e.message);
+        }
+    }
+
+    return lastGameHtml + recentHtml;
+}
+
+async function fetchInjuryReport() {
+    try {
+        const data = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries');
+        const pelicansTeam = (data.injuries || []).find(team =>
+            (team.displayName || '').toLowerCase().includes('pelicans')
+        );
+        if (!pelicansTeam || !pelicansTeam.injuries || pelicansTeam.injuries.length === 0) {
+            return '<div class="injury-item"><span class="injury-name">No injuries reported</span></div>';
+        }
+
+        return pelicansTeam.injuries.map(inj => {
+            const name = inj.athlete?.displayName || 'Unknown';
+            const status = inj.status || '';
+            const desc = inj.details?.detail || inj.longComment || '';
+            const location = inj.details?.location || '';
+
+            const isOut = status.toLowerCase().includes('out');
+            const statusClass = isOut ? 'injury-out' : 'injury-questionable';
+
+            // Build a clean label like "Out - Left Ankle Sprain"
+            let detail = '';
+            const side = inj.details?.side || '';
+            if (side && location && desc) detail = `${side} ${location} ${desc}`;
+            else if (location && desc) detail = `${location} ${desc}`;
+            else if (location) detail = location;
+            else if (desc) detail = desc;
+
+            let label = status;
+            if (detail) label = `${status} - ${detail}`.trim();
+
+            return `<div class="injury-item">
+                    <span class="injury-name">${name}</span>
+                    <span class="injury-status ${statusClass}">${label}</span>
+                </div>`;
+        }).join('\n');
+    } catch (e) {
+        console.log('Error fetching injury report:', e.message);
+        return '<div class="injury-item"><span class="injury-name">Could not load injuries</span></div>';
+    }
+}
+
 async function buildPage() {
     const dateStr = formatDate();
     const todayMatch = getTodayDateString();
@@ -250,7 +393,7 @@ async function buildPage() {
     console.log('Building for date:', todayMatch, '(' + dateStr + ')');
 
     // Load data files
-    const talkingPoints = loadJsonFile('./data/talking-points.json');
+    const talkingPointsFallback = loadJsonFile('./data/talking-points.json');
     const draftCapital = loadJsonFile('./data/draft-capital.json');
 
     let tvGamesHtml = '';
@@ -258,18 +401,31 @@ async function buildPage() {
     let last3GamesHtml = '';
     let next3GamesHtml = '';
     let recordStr = '';
+    let injuryHtml = '';
+    let boxScore = null;
+    let pelicansGames = { last3: [], last5: [], next3: [], record: { wins: 0, losses: 0 } };
 
     try {
         const scheduleData = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json');
 
         // Get Pelicans games
-        const pelicansGames = getPelicansGames(scheduleData);
+        pelicansGames = getPelicansGames(scheduleData);
         last3GamesHtml = generateLast3GamesHtml(pelicansGames.last3);
         next3GamesHtml = generateNext3GamesHtml(pelicansGames.next3);
         recordStr = `${pelicansGames.record.wins}-${pelicansGames.record.losses}`;
 
         console.log(`Found ${pelicansGames.last3.length} past games and ${pelicansGames.next3.length} upcoming games for Pelicans`);
         console.log(`Pelicans record: ${recordStr}`);
+
+        // Fetch box score for last game (for Sound Like You Know)
+        if (pelicansGames.last3.length > 0 && pelicansGames.last3[0].gameId) {
+            try {
+                boxScore = await fetchBoxScore(pelicansGames.last3[0].gameId);
+                console.log('Fetched box score for game:', pelicansGames.last3[0].gameId);
+            } catch (e) {
+                console.log('Could not fetch box score:', e.message);
+            }
+        }
 
         // Get today's TV games
         const gameDay = scheduleData.leagueSchedule.gameDates.find(gd =>
@@ -318,15 +474,20 @@ async function buildPage() {
         next3GamesHtml = '<div class="next-game"><span class="next-game-opponent">Couldn\'t load games</span></div>';
     }
 
-    // Generate talking points HTML (only one item)
-    let talkingPointsHtml = '';
-    if (talkingPoints && talkingPoints.item) {
+    // Generate talking points HTML (automated from box score + recent games)
+    let talkingPointsHtml = generateAutoTalkingPoints(boxScore, pelicansGames.last5);
+    // Fall back to manual JSON if automated generation produced nothing
+    if (!talkingPointsHtml && talkingPointsFallback && talkingPointsFallback.item) {
         talkingPointsHtml = `
             <div class="fun-fact">
-                <div class="fun-fact-label">${talkingPoints.item.label}</div>
-                <div class="fun-fact-text">${talkingPoints.item.text}</div>
+                <div class="fun-fact-label">${talkingPointsFallback.item.label}</div>
+                <div class="fun-fact-text">${talkingPointsFallback.item.text}</div>
             </div>`;
     }
+
+    // Fetch injury report from ESPN
+    injuryHtml = await fetchInjuryReport();
+    console.log('Injury report loaded');
 
     // Generate draft capital HTML
     let draftCapitalHtml = '';
@@ -347,12 +508,12 @@ async function buildPage() {
     }
 
     // Generate the full HTML
-    const html = generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr);
+    const html = generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr, injuryHtml);
     fs.writeFileSync('index.html', html);
     console.log('Page built successfully for', dateStr);
 }
 
-function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr) {
+function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talkingPointsHtml, recordStr, injuryHtml) {
     // YouTube search URL for Pelicans sorted by most recent uploads
     const youtubeUrl = 'https://www.youtube.com/@NBA/search?query=pelicans';
 
@@ -892,16 +1053,6 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
                 ${next3GamesHtml}
             </div>
 
-            <!-- YouTube Section - Right after Next 3 Games -->
-            <div class="pels-card pels-card-full pels-youtube-section">
-                <a href="${youtubeUrl}" target="_blank" class="youtube-link">
-                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    Search Pelicans on NBA YouTube
-                </a>
-            </div>
-
             <!-- Sound Like You Know -->
             <div class="pels-card pels-card-full">
                 <div class="pels-card-title">Sound Like You Know</div>
@@ -911,22 +1062,17 @@ function generateHTML(dateStr, tvGamesHtml, last3GamesHtml, next3GamesHtml, talk
             <!-- Injury Report -->
             <div class="pels-card">
                 <div class="pels-card-title">Injury Report</div>
-                <div class="injury-item">
-                    <span class="injury-name">Herb Jones</span>
-                    <span class="injury-status injury-out">Out - Ankle</span>
-                </div>
-                <div class="injury-item">
-                    <span class="injury-name">Dejounte Murray</span>
-                    <span class="injury-status injury-out">Out</span>
-                </div>
-                <div class="injury-item">
-                    <span class="injury-name">Jose Alvarado</span>
-                    <span class="injury-status injury-out">Out</span>
-                </div>
-                <div class="injury-item">
-                    <span class="injury-name">Trey Murphy III</span>
-                    <span class="injury-status injury-questionable">GTD - Back</span>
-                </div>
+                ${injuryHtml}
+            </div>
+
+            <!-- YouTube Section -->
+            <div class="pels-card pels-card-full pels-youtube-section">
+                <a href="${youtubeUrl}" target="_blank" class="youtube-link">
+                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    Search Pelicans on NBA YouTube
+                </a>
             </div>
 
         </div>
