@@ -1,7 +1,7 @@
 const fs = require('fs');
 const https = require('https');
 
-// Networks you want: Peacock, Amazon Prime, ABC, NBC (NOT ESPN, NBA TV)
+// Networks to display: Peacock, Amazon Prime, ABC, NBC (NOT ESPN, NBA TV)
 const WANTED_NETWORKS = ['ABC', 'NBC', 'PEACOCK', 'AMAZON', 'PRIME'];
 const EXCLUDED_NETWORKS = ['ESPN', 'NBA TV', 'NBATV'];
 
