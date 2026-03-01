@@ -25,6 +25,24 @@ const TEAM_ABBREVS = {
     'Toronto Raptors': 'TOR', 'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
 };
 
+// Team primary colors (dark enough to read on white)
+const TEAM_COLORS = {
+    'Atlanta Hawks': '#C8102E', 'Boston Celtics': '#007A33', 'Brooklyn Nets': '#000000',
+    'Charlotte Hornets': '#1D1160', 'Chicago Bulls': '#CE1141', 'Cleveland Cavaliers': '#6F263D',
+    'Dallas Mavericks': '#00538C', 'Denver Nuggets': '#0E2240', 'Detroit Pistons': '#C8102E',
+    'Golden State Warriors': '#1D428A', 'Houston Rockets': '#CE1141', 'Indiana Pacers': '#002D62',
+    'Los Angeles Clippers': '#C8102E', 'Los Angeles Lakers': '#552583', 'Memphis Grizzlies': '#5D76A9',
+    'Miami Heat': '#98002E', 'Milwaukee Bucks': '#00471B', 'Minnesota Timberwolves': '#0C2340',
+    'New Orleans Pelicans': '#C8A961', 'New York Knicks': '#006BB6', 'Oklahoma City Thunder': '#007AC1',
+    'Orlando Magic': '#0077C0', 'Philadelphia 76ers': '#006BB6', 'Phoenix Suns': '#1D1160',
+    'Portland Trail Blazers': '#E03A3E', 'Sacramento Kings': '#5A2D81', 'San Antonio Spurs': '#000000',
+    'Toronto Raptors': '#CE1141', 'Utah Jazz': '#002B5C', 'Washington Wizards': '#002B5C'
+};
+
+function getTeamColor(city, name) {
+    return TEAM_COLORS[`${city} ${name}`] || '#333';
+}
+
 // ============ Utility Functions ============
 
 function fetch(url) {
@@ -346,6 +364,25 @@ async function fetchInjuryReport() {
 
 // ============ Claude API ============
 
+// Track API usage across calls
+const apiUsage = { inputTokens: 0, outputTokens: 0 };
+
+// Claude Sonnet 4.5 pricing per million tokens
+const PRICING = { input: 3.0, output: 15.0 };
+
+function trackUsage(response) {
+    if (response.usage) {
+        apiUsage.inputTokens += response.usage.input_tokens || 0;
+        apiUsage.outputTokens += response.usage.output_tokens || 0;
+    }
+}
+
+function getApiCost() {
+    const inputCost = (apiUsage.inputTokens / 1_000_000) * PRICING.input;
+    const outputCost = (apiUsage.outputTokens / 1_000_000) * PRICING.output;
+    return (inputCost + outputCost).toFixed(4);
+}
+
 async function getPelicansRecap(game) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -373,6 +410,7 @@ async function getPelicansRecap(game) {
             }]
         });
 
+        trackUsage(response);
         const textBlocks = response.content.filter(b => b.type === 'text');
         return textBlocks.map(b => b.text).join(' ').trim();
     } catch (error) {
@@ -424,26 +462,43 @@ Return ONLY valid JSON (no markdown, no code fences), with this exact structure:
 }
 
 Guidelines:
-- "scores": Include ALL final scores from last night's NBA games. For each game, include the final score and a brief 5-10 word note.
-- "stats": 3-4 standout individual performances from last night
+- "scores": Only the 2-3 most notable/exciting games from last night. Include the final score and a brief 5-10 word note. Skip blowouts and uneventful games.
+- "stats": 2-3 standout individual performances from last night
 - "highlights": 1-2 notable plays with links to NBA YouTube or social media clips if you can find them
-- "news": 3-4 current NBA news items (trades, injuries, standings races, etc.)
-- "pundit_takes": 3 notable takes from sports media personalities with attribution
-- "top_tweet": The most notable/viral NBA tweet from yesterday
+- "news": 2-3 current NBA news items (trades, injuries, standings races, etc.)
+- "pundit_takes": 1-2 notable takes from sports media personalities with attribution
+- "top_tweet": Find the most recent/notable tweet from World Wide Wob (@WorldWideWob). Only use a tweet from this account, no one else
 
 Search for: "NBA scores last night", "NBA highlights today", "NBA news today", "NBA trades rumors today"`
             }]
         });
 
+        trackUsage(response);
         const textBlocks = response.content.filter(b => b.type === 'text');
         const fullText = textBlocks.map(b => b.text).join(' ').trim();
 
-        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+        // Strip markdown code fences before parsing
+        let cleaned = fullText.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+
+        // Try direct parse first
+        try {
+            return JSON.parse(cleaned);
+        } catch (e) {
+            // Fall back to regex extraction
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                try {
+                    return JSON.parse(jsonMatch[0]);
+                } catch (e2) {
+                    console.error('Could not parse league content JSON:', e2.message);
+                    console.error('Raw text (first 500 chars):', fullText.substring(0, 500));
+                    return null;
+                }
+            }
+            console.error('No JSON object found in league content');
+            console.error('Raw text (first 500 chars):', fullText.substring(0, 500));
+            return null;
         }
-        console.error('Could not parse league content JSON');
-        return null;
     } catch (error) {
         console.error('Error getting league content:', error.message);
         return null;
@@ -452,364 +507,197 @@ Search for: "NBA scores last night", "NBA highlights today", "NBA news today", "
 
 // ============ Email HTML Generation ============
 
-function generateTVGamesSection(tvGames, dateStr) {
-    if (tvGames.length === 0) {
-        return `
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
-            <tr><td style="padding:20px 20px 5px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;text-transform:lowercase;letter-spacing:1px;color:#333;">nba tonight</td></tr>
-            <tr><td style="padding:0 20px 5px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#888;">${dateStr}</td></tr>
-            <tr><td style="padding:15px 20px 20px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#888;">No national TV games today.</td></tr>
-        </table>`;
-    }
+const S = {
+    font: 'font-family:Arial,Helvetica,sans-serif;',
+    body: 'font-size:14px;color:#333;line-height:22px;',
+    header: 'font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:#333;',
+    subheader: 'font-size:14px;font-weight:bold;color:#555;',
+    divider: 'border-top:1px solid #ddd;',
+    pad: 'padding:0 20px;',
+    winColor: '#2d8a4e',
+    lossColor: '#c0392b',
+    gold: '#C8A961',
+};
 
-    let rows = '';
-    for (const game of tvGames) {
-        const time = formatTime(game.gameDateTimeUTC);
-        const networks = game.broadcasters.nationalBroadcasters
-            .map(b => b.broadcasterDisplay)
-            .filter(n => isWantedNetwork(n))
-            .join(', ');
-        const awayAbbrev = getTeamAbbrev(game.awayTeam.teamCity, game.awayTeam.teamName);
-        const homeAbbrev = getTeamAbbrev(game.homeTeam.teamCity, game.homeTeam.teamName);
-        const isPelsGame = isPelicansGame(game);
-        const rowBg = isPelsGame ? '#FFF8E7' : '#ffffff';
-        const leftBorder = isPelsGame ? 'border-left:3px solid #C8A961;' : '';
-
-        rows += `
-            <tr style="background:${rowBg};">
-                <td style="padding:10px 15px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#111;${leftBorder}">${awayAbbrev} <span style="color:#999;font-size:11px;">@</span> ${homeAbbrev}</td>
-                <td style="padding:10px 15px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#666;text-align:center;">${time}</td>
-                <td style="padding:10px 15px;text-align:right;"><span style="font-family:Arial,Helvetica,sans-serif;font-size:10px;background:#f0f0f0;color:#555;padding:3px 8px;border-radius:3px;text-transform:uppercase;">${networks}</span></td>
-            </tr>`;
-    }
-
-    return `
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
-        <tr><td style="padding:20px 20px 5px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;text-transform:lowercase;letter-spacing:1px;color:#333;">nba tonight</td></tr>
-        <tr><td style="padding:0 20px 10px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#888;">${dateStr}</td></tr>
-        <tr><td style="padding:0 20px 20px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                ${rows}
-            </table>
-        </td></tr>
-    </table>`;
+function row(content, style = '') {
+    return `<tr><td style="${S.font}${S.body}${S.pad}${style}">${content}</td></tr>`;
 }
 
-function generatePelicansSection(pelicansGames, todayGame, recap, talkingPointItems, injuries, talkingPointsFallback) {
-    const { last3, next3, record } = pelicansGames;
-    const recordStr = `${record.wins}-${record.losses}`;
+function dividerRow() {
+    return `<tr><td style="padding:15px 20px;"><div style="${S.divider}"></div></td></tr>`;
+}
 
-    // Today's game callout
-    let todayCallout = '';
+function sectionHeader(text) {
+    return row(text, `${S.header}padding-top:20px;padding-bottom:10px;`);
+}
+
+function generateEmail(dateStr, tvGames, pelicansGames, todayGame, recap, talkingPointItems, injuries, talkingPointsFallback, leagueContent, cost) {
+    const { last3, next3, record } = pelicansGames;
+    const rows = [];
+
+    // ── Title ──
+    rows.push(`<tr><td style="${S.font}padding:30px 20px 2px;font-size:28px;font-weight:bold;color:#111;">NBA Today</td></tr>`);
+    rows.push(`<tr><td style="${S.font}padding:0 20px 5px;font-size:13px;color:#999;">${dateStr}</td></tr>`);
+    rows.push(dividerRow());
+
+    // ── TONIGHT ON TV ──
+    rows.push(`<tr><td style="${S.font}${S.pad}padding-top:20px;padding-bottom:10px;font-size:22px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:${S.gold};">Tonight on TV</td></tr>`);
+    if (tvGames.length === 0) {
+        rows.push(row('No national TV games today.', 'color:#999;padding-bottom:10px;'));
+    } else {
+        for (const game of tvGames) {
+            const time = formatTime(game.gameDateTimeUTC);
+            const networks = game.broadcasters.nationalBroadcasters
+                .map(b => b.broadcasterDisplay)
+                .filter(n => isWantedNetwork(n))
+                .join(', ');
+            const awayColor = getTeamColor(game.awayTeam.teamCity, game.awayTeam.teamName);
+            const homeColor = getTeamColor(game.homeTeam.teamCity, game.homeTeam.teamName);
+            const away = `<span style="color:${awayColor};">${game.awayTeam.teamCity} ${game.awayTeam.teamName}</span>`;
+            const home = `<span style="color:${homeColor};">${game.homeTeam.teamCity} ${game.homeTeam.teamName}</span>`;
+            rows.push(row(`&nbsp;&nbsp;${away} @ ${home} &middot; ${time} (${networks})`, 'padding-bottom:4px;'));
+        }
+    }
+    rows.push(dividerRow());
+
+    // ── PELICANS CENTRAL ──
+    const recordStr = `${record.wins}-${record.losses}`;
+    rows.push(`<tr><td style="${S.font}${S.pad}padding-top:20px;padding-bottom:2px;font-size:22px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:${S.gold};">Pelicans Central</td></tr>`);
+    rows.push(`<tr><td style="${S.font}${S.pad}padding-bottom:12px;font-size:13px;color:#999;">${recordStr}</td></tr>`);
+
+    // Tonight callout
     if (todayGame) {
         const isPelicansHome = todayGame.homeTeam.teamId === FAVORITE_TEAM_ID;
         const opponent = isPelicansHome ? todayGame.awayTeam : todayGame.homeTeam;
         const prefix = isPelicansHome ? 'vs' : '@';
         const time = formatTime(todayGame.gameDateTimeUTC);
-        todayCallout = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#1A3A5C;border:2px solid #C8A961;border-radius:8px;">
-                <tr><td style="padding:15px;text-align:center;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:5px;">Tonight</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#ffffff;">${prefix} ${opponent.teamCity} ${opponent.teamName}</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#6B8299;margin-top:5px;">${time} PST</div>
-                </td></tr>
-            </table>
-        </td></tr>`;
+        rows.push(row(`<span style="font-size:16px;color:${S.lossColor};font-weight:bold;">&#9658; TONIGHT</span><br>&nbsp;&nbsp;&nbsp;${prefix} ${opponent.teamCity} ${opponent.teamName} &middot; ${time} PST`, 'padding-bottom:12px;'));
     }
 
-    // Recap
-    let recapHtml = '';
+    // Last Night recap
     if (recap) {
-        recapHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#162D4A;border:1px solid rgba(200,169,97,0.2);border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:8px;">Last Night's Recap</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E8D9A0;line-height:1.6;">${recap}</div>
-                </td></tr>
-            </table>
-        </td></tr>`;
+        let recapLines = `&nbsp;&nbsp;&nbsp;${recap}`;
+        rows.push(row(`<strong>Last Night</strong><br>${recapLines}`, 'padding-bottom:12px;'));
     }
 
-    // Last 3 games
-    let last3Rows = '';
-    if (last3.length === 0) {
-        last3Rows = '<tr><td colspan="3" style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6B8299;">No recent games</td></tr>';
-    } else {
-        for (const game of last3) {
-            const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
-            const opponent = isPelicansHome ? game.awayTeam : game.homeTeam;
-            const pelicansScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
-            const opponentScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
-            const isWin = pelicansScore > opponentScore;
-            const prefix = isPelicansHome ? 'vs' : '@';
-            const resultColor = isWin ? '#7FBF7F' : '#BF7F7F';
-            const resultText = isWin ? 'W' : 'L';
-            const dateStr = formatShortDate(game.gameDateTimeUTC);
-
-            last3Rows += `
-                <tr>
-                    <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${resultColor};border-bottom:1px solid rgba(200,169,97,0.1);">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</td>
-                    <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:#E8D9A0;text-align:right;border-bottom:1px solid rgba(200,169,97,0.1);">${resultText} ${pelicansScore}-${opponentScore}</td>
-                    <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#6B8299;text-align:right;border-bottom:1px solid rgba(200,169,97,0.1);padding-left:10px;">${dateStr}</td>
-                </tr>`;
-        }
-    }
-
-    // Next 3 games
-    let next3Rows = '';
-    if (next3.length === 0) {
-        next3Rows = '<tr><td colspan="2" style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6B8299;">No upcoming games</td></tr>';
-    } else {
+    // Coming Up
+    if (next3.length > 0) {
+        let comingUpLines = '';
         for (const game of next3) {
             const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
             const opponent = isPelicansHome ? game.awayTeam : game.homeTeam;
             const prefix = isPelicansHome ? 'vs' : '@';
-            const locationColor = isPelicansHome ? '#7FBF7F' : '#BF7F7F';
+            const oppName = getTeamName(opponent.teamCity, opponent.teamName);
             const dateTimeStr = formatGameDateTime(game.gameDateTimeUTC);
-
-            next3Rows += `
-                <tr>
-                    <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${locationColor};border-bottom:1px solid rgba(200,169,97,0.1);">${prefix} ${getTeamName(opponent.teamCity, opponent.teamName)}</td>
-                    <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#6B8299;text-align:right;border-bottom:1px solid rgba(200,169,97,0.1);">${dateTimeStr}</td>
-                </tr>`;
+            comingUpLines += `<br>&nbsp;&nbsp;&nbsp;${prefix} ${oppName}&nbsp;&nbsp;&nbsp;<span style="color:#999;">${dateTimeStr}</span>`;
         }
+        rows.push(row(`<strong>Coming Up</strong>${comingUpLines}`, 'padding-bottom:12px;'));
     }
 
-    // Sound Like You Know — auto-generated items + fallback
-    let talkingPointsHtml = '';
-    const allItems = [...talkingPointItems];
-    if (talkingPointsFallback && talkingPointsFallback.item) {
-        allItems.push(talkingPointsFallback.item);
-    }
-    if (allItems.length > 0) {
-        const itemRows = allItems.map(item => `
-            <tr><td style="padding:0;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(200,169,97,0.1);border-left:3px solid #C8A961;border-radius:0 6px 6px 0;margin-bottom:8px;">
-                    <tr><td style="padding:10px 12px;">
-                        <div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#C8A961;margin-bottom:3px;">${item.label}</div>
-                        <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#E8D9A0;line-height:1.4;">${item.text}</div>
-                    </td></tr>
-                </table>
-            </td></tr>`).join('');
-
-        talkingPointsHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#162D4A;border:1px solid rgba(200,169,97,0.2);border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:10px;">Sound Like You Know</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${itemRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
+    // Last 3 Results
+    if (last3.length > 0) {
+        let last3Lines = '';
+        for (const game of last3) {
+            const isPelicansHome = game.homeTeam.teamId === FAVORITE_TEAM_ID;
+            const opponent = isPelicansHome ? game.awayTeam : game.homeTeam;
+            const pelScore = isPelicansHome ? game.homeTeam.score : game.awayTeam.score;
+            const oppScore = isPelicansHome ? game.awayTeam.score : game.homeTeam.score;
+            const isWin = pelScore > oppScore;
+            const wl = isWin ? 'W' : 'L';
+            const wlColor = isWin ? S.winColor : S.lossColor;
+            const prefix = isPelicansHome ? 'vs' : '@';
+            const oppName = getTeamName(opponent.teamCity, opponent.teamName);
+            const dateShort = formatShortDate(game.gameDateTimeUTC);
+            last3Lines += `<br>&nbsp;&nbsp;&nbsp;<span style="color:${wlColor};font-weight:bold;">${wl}</span>&nbsp;&nbsp;${prefix} ${oppName}&nbsp;&nbsp;&nbsp;${pelScore}-${oppScore}&nbsp;&nbsp;&nbsp;<span style="color:#999;">${dateShort}</span>`;
+        }
+        rows.push(row(`<strong>Last 3 Results</strong>${last3Lines}`, 'padding-bottom:12px;'));
     }
 
-    // Injury report
-    let injuryHtml = '';
+    // Injuries
     if (injuries && injuries.length > 0) {
-        const injuryRows = injuries.map(inj => {
-            const statusBg = inj.isOut ? '#5C1F1F' : '#5C4A1F';
-            const statusColor = inj.isOut ? '#E87777' : '#E8C777';
-            return `
-                <tr>
-                    <td style="padding:5px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#ccc;">${inj.name}</td>
-                    <td style="padding:5px 0;text-align:right;"><span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:bold;text-transform:uppercase;background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:10px;">${inj.label}</span></td>
-                </tr>`;
-        }).join('');
-
-        injuryHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#162D4A;border:1px solid rgba(200,169,97,0.2);border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:10px;">Injury Report</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${injuryRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
+        let injuryLines = '';
+        for (const inj of injuries) {
+            injuryLines += `<br>&nbsp;&nbsp;&nbsp;${inj.name} &mdash; Out`;
+        }
+        rows.push(row(`<strong>Injuries</strong>${injuryLines}`, 'padding-bottom:12px;'));
     }
 
-    return `
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#0C2340;">
-        <!-- Gold/red accent bar -->
-        <tr><td style="height:4px;background:linear-gradient(90deg,#C8A961,#E31837,#C8A961);font-size:0;line-height:0;">&nbsp;</td></tr>
-
-        <!-- Header -->
-        <tr><td style="padding:25px 20px 5px;text-align:center;">
-            <div style="font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:bold;color:#C8A961;text-transform:uppercase;letter-spacing:3px;">Pelicans Central</div>
-        </td></tr>
-        <tr><td style="padding:5px 20px 20px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6B8299;letter-spacing:1px;">${recordStr}</td></tr>
-
-        <!-- Tonight's game -->
-        ${todayCallout}
-
-        <!-- Recap -->
-        ${recapHtml}
-
-        <!-- Last 3 / Next 3 side by side -->
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-                <tr valign="top">
-                    <!-- Last 3 -->
-                    <td width="48%" style="padding-right:2%;">
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background:#162D4A;border:1px solid rgba(200,169,97,0.2);border-radius:8px;">
-                            <tr><td style="padding:15px;">
-                                <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:10px;">Last 3 Games</div>
-                                <table width="100%" cellpadding="0" cellspacing="0">
-                                    ${last3Rows}
-                                </table>
-                            </td></tr>
-                        </table>
-                    </td>
-                    <!-- Next 3 -->
-                    <td width="48%" style="padding-left:2%;">
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background:#162D4A;border:1px solid rgba(200,169,97,0.2);border-radius:8px;">
-                            <tr><td style="padding:15px;">
-                                <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#C8A961;margin-bottom:10px;">Next 3 Games</div>
-                                <table width="100%" cellpadding="0" cellspacing="0">
-                                    ${next3Rows}
-                                </table>
-                            </td></tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td></tr>
-
-        <!-- Talking Points -->
-        ${talkingPointsHtml}
-
-        <!-- Injury Report -->
-        ${injuryHtml}
-    </table>`;
-}
-
-function generateLeagueSection(leagueContent) {
-    if (!leagueContent) {
-        return '';
+    // Recent Pelicans Notes (auto-generated only, no fallback)
+    const allItems = [...talkingPointItems];
+    if (allItems.length > 0) {
+        let noteLines = '';
+        for (const item of allItems) {
+            noteLines += `<br>&nbsp;&nbsp;&nbsp;<span style="color:#999;font-size:11px;text-transform:uppercase;">${item.label}</span><br>&nbsp;&nbsp;&nbsp;${item.text}`;
+        }
+        rows.push(row(`<strong>Recent Pelicans Notes</strong>${noteLines}`, 'padding-bottom:12px;'));
     }
 
-    // Scores
-    let scoresHtml = '';
-    if (leagueContent.scores && leagueContent.scores.length > 0) {
-        const scoreRows = leagueContent.scores.map(s =>
-            `<tr><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;border-bottom:1px solid #444;">&#8226; ${s.summary}</td></tr>`
-        ).join('');
-        scoresHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">Last Night's Scores</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${scoreRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
+    rows.push(dividerRow());
+
+    // ── AROUND THE LEAGUE ──
+    if (leagueContent) {
+        rows.push(`<tr><td style="${S.font}${S.pad}padding-top:20px;padding-bottom:10px;font-size:22px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:${S.gold};">Around the League</td></tr>`);
+
+        // Last Night's Scores
+        if (leagueContent.scores && leagueContent.scores.length > 0) {
+            rows.push(row(`<strong style="color:#555;">Last Night's Scores</strong>`, 'padding-bottom:6px;'));
+            for (const s of leagueContent.scores) {
+                rows.push(row(`&nbsp;&nbsp;&bull; ${s.summary}`, 'padding-bottom:3px;'));
+            }
+            rows.push(row('', 'padding-bottom:8px;'));
+        }
+
+        // Notable Stats
+        if (leagueContent.stats && leagueContent.stats.length > 0) {
+            rows.push(row(`<strong style="color:#555;">Notable Stats</strong>`, 'padding-bottom:6px;'));
+            for (const s of leagueContent.stats) {
+                rows.push(row(`&nbsp;&nbsp;&bull; ${s.text}`, 'padding-bottom:3px;'));
+            }
+            rows.push(row('', 'padding-bottom:8px;'));
+        }
+
+        // Highlights
+        if (leagueContent.highlights && leagueContent.highlights.length > 0) {
+            rows.push(row(`<strong style="color:#555;">Highlights</strong>`, 'padding-bottom:6px;'));
+            for (const h of leagueContent.highlights) {
+                const link = h.url ? ` &mdash; <a href="${h.url}" style="color:#2563eb;">Watch</a>` : '';
+                rows.push(row(`&nbsp;&nbsp;&bull; ${h.text}${link}`, 'padding-bottom:3px;'));
+            }
+            rows.push(row('', 'padding-bottom:8px;'));
+        }
+
+        // League News
+        if (leagueContent.news && leagueContent.news.length > 0) {
+            rows.push(row(`<strong style="color:#555;">League News</strong>`, 'padding-bottom:6px;'));
+            for (const n of leagueContent.news) {
+                rows.push(row(`&nbsp;&nbsp;&bull; ${n.text}`, 'padding-bottom:3px;'));
+            }
+            rows.push(row('', 'padding-bottom:8px;'));
+        }
+
+        // Pundit Takes
+        if (leagueContent.pundit_takes && leagueContent.pundit_takes.length > 0) {
+            rows.push(row(`<strong style="color:#555;">Pundit Takes</strong>`, 'padding-bottom:6px;'));
+            for (const p of leagueContent.pundit_takes) {
+                rows.push(row(`&nbsp;&nbsp;&ldquo;${p.text}&rdquo; &mdash; <span style="color:#999;">${p.source}</span>`, 'padding-bottom:5px;'));
+            }
+            rows.push(row('', 'padding-bottom:8px;'));
+        }
+
+        // Top Tweet
+        if (leagueContent.top_tweet && leagueContent.top_tweet.text) {
+            rows.push(row(`<strong style="color:#555;">Top Tweet</strong>`, 'padding-bottom:6px;'));
+            const tweetLink = leagueContent.top_tweet.url ? ` <a href="${leagueContent.top_tweet.url}" style="color:#2563eb;">View</a>` : '';
+            rows.push(row(`&nbsp;&nbsp;&ldquo;${leagueContent.top_tweet.text}&rdquo; &mdash; ${leagueContent.top_tweet.author}${tweetLink}`, 'padding-bottom:8px;'));
+        }
+
+        rows.push(dividerRow());
     }
 
-    // Stats
-    let statsHtml = '';
-    if (leagueContent.stats && leagueContent.stats.length > 0) {
-        const statRows = leagueContent.stats.map(s =>
-            `<tr><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;border-bottom:1px solid #444;">&#8226; ${s.text}</td></tr>`
-        ).join('');
-        statsHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">Notable Stats</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${statRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
-    }
+    // ── Footer ──
+    const costStr = cost ? ` &middot; API cost: $${cost}` : '';
+    rows.push(`<tr><td style="${S.font}padding:10px 20px 30px;font-size:11px;color:#bbb;">NBA Today &middot; Generated ${dateStr}${costStr}</td></tr>`);
 
-    // Highlights
-    let highlightsHtml = '';
-    if (leagueContent.highlights && leagueContent.highlights.length > 0) {
-        const highlightRows = leagueContent.highlights.map(h => {
-            const link = h.url ? ` <a href="${h.url}" style="color:#64B5F6;text-decoration:underline;">Watch</a>` : '';
-            return `<tr><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;border-bottom:1px solid #444;">&#8226; ${h.text}${link}</td></tr>`;
-        }).join('');
-        highlightsHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">Highlights</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${highlightRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
-    }
-
-    // News
-    let newsHtml = '';
-    if (leagueContent.news && leagueContent.news.length > 0) {
-        const newsRows = leagueContent.news.map(n =>
-            `<tr><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;border-bottom:1px solid #444;">&#8226; ${n.text}</td></tr>`
-        ).join('');
-        newsHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">League News</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${newsRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
-    }
-
-    // Pundit takes
-    let punditHtml = '';
-    if (leagueContent.pundit_takes && leagueContent.pundit_takes.length > 0) {
-        const punditRows = leagueContent.pundit_takes.map(p =>
-            `<tr><td style="padding:8px 0;border-bottom:1px solid #444;">
-                <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;font-style:italic;">"${p.text}"</div>
-                <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;margin-top:3px;">— ${p.source}</div>
-            </td></tr>`
-        ).join('');
-        punditHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">Pundit Takes</div>
-                    <table width="100%" cellpadding="0" cellspacing="0">${punditRows}</table>
-                </td></tr>
-            </table>
-        </td></tr>`;
-    }
-
-    // Top tweet
-    let tweetHtml = '';
-    if (leagueContent.top_tweet && leagueContent.top_tweet.text) {
-        const tweetLink = leagueContent.top_tweet.url ? ` <a href="${leagueContent.top_tweet.url}" style="color:#64B5F6;text-decoration:underline;">View</a>` : '';
-        tweetHtml = `
-        <tr><td style="padding:0 20px 15px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#3A3A3A;border-radius:8px;">
-                <tr><td style="padding:15px;">
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#FFD700;margin-bottom:10px;">Top Tweet</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#E0E0E0;font-style:italic;border-left:3px solid #64B5F6;padding-left:10px;">"${leagueContent.top_tweet.text}"</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;margin-top:5px;">${leagueContent.top_tweet.author}${tweetLink}</div>
-                </td></tr>
-            </table>
-        </td></tr>`;
-    }
-
-    return `
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#2D2D2D;">
-        <tr><td style="padding:25px 20px 5px;text-align:center;">
-            <div style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#FFD700;text-transform:uppercase;letter-spacing:3px;">Around the League</div>
-        </td></tr>
-        <tr><td style="padding:5px 20px 20px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;">Powered by Claude AI with web search</td></tr>
-        ${scoresHtml}
-        ${statsHtml}
-        ${highlightsHtml}
-        ${newsHtml}
-        ${punditHtml}
-        ${tweetHtml}
-    </table>`;
-}
-
-function generateFullEmail(dateStr, tvSection, pelicansSection, leagueSection) {
     return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -817,20 +705,11 @@ function generateFullEmail(dateStr, tvSection, pelicansSection, leagueSection) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NBA Today - ${dateStr}</title>
 </head>
-<body style="margin:0;padding:0;background:#111111;font-family:Arial,Helvetica,sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#111111;">
-        <tr><td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;margin:0 auto;">
-                <!-- TV Games -->
-                <tr><td>${tvSection}</td></tr>
-                <!-- Pelicans -->
-                <tr><td>${pelicansSection}</td></tr>
-                <!-- League -->
-                <tr><td>${leagueSection}</td></tr>
-                <!-- Footer -->
-                <tr><td style="background:#111111;padding:20px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#666;">
-                    NBA Today Newsletter &bull; Generated ${dateStr}
-                </td></tr>
+<body style="margin:0;padding:0;background:#f5f5f5;${S.font}">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;">
+        <tr><td align="center" style="padding:20px 0;">
+            <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;margin:0 auto;background:#ffffff;">
+                ${rows.join('\n                ')}
             </table>
         </td></tr>
     </table>
@@ -926,13 +805,10 @@ async function main() {
     console.log('Fetching league content from Claude...');
     const leagueContent = await getLeagueContent();
 
-    // Generate email sections
-    const tvSection = generateTVGamesSection(tvGames, dateStr);
-    const pelicansSection = generatePelicansSection(pelicansGames, todayGame, recap, talkingPointItems, injuries, talkingPointsFallback);
-    const leagueSection = generateLeagueSection(leagueContent);
-
-    // Generate full email
-    const emailHtml = generateFullEmail(dateStr, tvSection, pelicansSection, leagueSection);
+    // Generate email
+    const cost = getApiCost();
+    console.log(`API cost: $${cost} (${apiUsage.inputTokens} input, ${apiUsage.outputTokens} output tokens)`);
+    const emailHtml = generateEmail(dateStr, tvGames, pelicansGames, todayGame, recap, talkingPointItems, injuries, talkingPointsFallback, leagueContent, cost);
 
     // Send email
     await sendEmail(emailHtml, dateStr);
