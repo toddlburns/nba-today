@@ -801,9 +801,14 @@ async function main() {
         recap = await getPelicansRecap(yesterdayGame);
     }
 
-    // Get league content from Claude
-    console.log('Fetching league content from Claude...');
-    const leagueContent = await getLeagueContent();
+    // Get league content from Claude (retry up to 3 times)
+    let leagueContent = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        console.log(`Fetching league content from Claude (attempt ${attempt}/3)...`);
+        leagueContent = await getLeagueContent();
+        if (leagueContent) break;
+        console.log(`Attempt ${attempt} failed, ${attempt < 3 ? 'retrying...' : 'giving up.'}`);
+    }
 
     // Generate email
     const cost = getApiCost();
