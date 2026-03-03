@@ -450,15 +450,7 @@ Return ONLY valid JSON (no markdown, no code fences), with this exact structure:
   ],
   "news": [
     { "text": "Brief news item about trades, injuries, standings, etc." }
-  ],
-  "pundit_takes": [
-    { "text": "What the pundit said", "source": "Pundit Name, Show/Platform" }
-  ],
-  "top_tweet": {
-    "text": "The tweet text",
-    "author": "@handle",
-    "url": "URL to the tweet or empty string"
-  }
+  ]
 }
 
 Guidelines:
@@ -466,8 +458,6 @@ Guidelines:
 - "stats": 2-3 standout individual performances from last night
 - "highlights": 1-2 notable plays with links to NBA YouTube or social media clips if you can find them
 - "news": 2-3 current NBA news items (trades, injuries, standings races, etc.)
-- "pundit_takes": 1-2 notable takes from sports media personalities with attribution
-- "top_tweet": Find the most recent/notable tweet from World Wide Wob (@WorldWideWob). Only use a tweet from this account, no one else
 
 Search for: "NBA scores last night", "NBA highlights today", "NBA news today", "NBA trades rumors today"`
             }]
@@ -673,22 +663,6 @@ function generateEmail(dateStr, tvGames, pelicansGames, todayGame, recap, talkin
                 rows.push(row(`&nbsp;&nbsp;&bull; ${n.text}`, 'padding-bottom:3px;'));
             }
             rows.push(row('', 'padding-bottom:8px;'));
-        }
-
-        // Pundit Takes
-        if (leagueContent.pundit_takes && leagueContent.pundit_takes.length > 0) {
-            rows.push(row(`<strong style="color:#555;">Pundit Takes</strong>`, 'padding-bottom:6px;'));
-            for (const p of leagueContent.pundit_takes) {
-                rows.push(row(`&nbsp;&nbsp;&ldquo;${p.text}&rdquo; &mdash; <span style="color:#999;">${p.source}</span>`, 'padding-bottom:5px;'));
-            }
-            rows.push(row('', 'padding-bottom:8px;'));
-        }
-
-        // Top Tweet
-        if (leagueContent.top_tweet && leagueContent.top_tweet.text) {
-            rows.push(row(`<strong style="color:#555;">Top Tweet</strong>`, 'padding-bottom:6px;'));
-            const tweetLink = leagueContent.top_tweet.url ? ` <a href="${leagueContent.top_tweet.url}" style="color:#2563eb;">View</a>` : '';
-            rows.push(row(`&nbsp;&nbsp;&ldquo;${leagueContent.top_tweet.text}&rdquo; &mdash; ${leagueContent.top_tweet.author}${tweetLink}`, 'padding-bottom:8px;'));
         }
 
         rows.push(dividerRow());
